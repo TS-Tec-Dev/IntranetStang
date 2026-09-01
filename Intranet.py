@@ -1582,7 +1582,7 @@ if menu is not None:
                     
                 with g_c_2:
                     fig_c_status = px.histogram(df_c_filtrado, x='Status', title="Pedidos por Status", color='Status', text_auto=True)
-                    fig_c_status.update_layout(**layout_kw := layout_cfg, bargap=0.2)
+                    fig_c_status.update_layout(**layout_cfg, bargap=0.2)
                     st.plotly_chart(fig_c_status, use_container_width=True)
 
                 g_c_3, g_c_4 = st.columns([1.5, 1])
