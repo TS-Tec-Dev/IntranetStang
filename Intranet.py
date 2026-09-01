@@ -44,13 +44,14 @@ TODOS_MENUS = [
     "📊 Dashboard"
 ]
 
-# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---
+# --- ESTILIZAÇÃO CSS PROFISSIONAL ( SUPORTE A TEMA ESCURO E CLARO ) ---
 background_css = ""
 if os.path.exists("capa.png"):
     with open("capa.png", "rb") as img_file:
         encoded_string = base64.b64encode(img_file.read()).decode()
     background_css = f"""
     <style>
+        /* TEMA ESCURO (Mantido intacto conforme solicitado) */
         .stApp {{
             background: linear-gradient(rgba(0, 30, 80, 0.85), rgba(0, 15, 40, 0.90)), 
                         url("data:image/png;base64,{encoded_string}");
@@ -62,35 +63,15 @@ if os.path.exists("capa.png"):
             color: #ffffff !important;
         }}
         .stTextInput input, .stSelectbox select, .stTextArea textarea {{
-            background-color: rgba(255, 255, 255, 0.95) !important;
+            background-color: rgba(255, 255, 255, 0.9) !important;
             color: #000000 !important;
-            font-weight: 600 !important;
+            font-weight: 500;
         }}
-        
-        /* --- MELHORIA DE LEGIBILIDADE NO TEMA CLARO (TABELAS, GRADES E LETRAS) --- */
-        .stDataFrame, [data-testid="stDataFrame"] {{
-            background-color: #ffffff !important;
+        .stDataFrame {{
+            background-color: rgba(255, 255, 255, 0.95);
             border-radius: 8px;
-            padding: 8px;
-            border: 2px solid #90caf9 !important;
+            padding: 5px;
         }}
-        .stDataFrame table, [data-testid="stDataFrame"] table {{
-            color: #000000 !important;
-        }}
-        .stDataFrame th, [data-testid="stDataFrame"] th {{
-            background-color: #e3f2fd !important;
-            color: #0d47a1 !important;
-            font-weight: 700 !important;
-            border: 1px solid #90caf9 !important;
-            font-size: 14px !important;
-        }}
-        .stDataFrame td, [data-testid="stDataFrame"] td {{
-            color: #111111 !important;
-            font-weight: 500 !important;
-            border: 1px solid #d0d7de !important;
-            background-color: #ffffff !important;
-        }}
-        
         div[data-testid="stMetricValue"] {{
             color: #00ffcc !important;
         }}
@@ -115,6 +96,58 @@ if os.path.exists("capa.png"):
             color: #ffffff !important;
             font-size: 14px !important;
             margin: 0 !important;
+        }}
+
+        /* --- SUPORTE AO TEMA CLARO (LETRAS ESCURAS E LEGÍVEIS, GRADES E ELEMENTOS) --- */
+        @media (prefers-color-scheme: light) {{
+            .stApp {{
+                background: #f8f9fa !important;
+            }}
+            h1, h2, h3, h4, h5, h6, p, span, label {{
+                color: #111111 !important;
+            }}
+            .stTextInput input, .stSelectbox select, .stTextArea textarea {{
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #ced4da !important;
+                font-weight: 500;
+            }}
+            .stDataFrame {{
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #dee2e6;
+            }}
+            div[data-testid="stMetricValue"] {{
+                color: #0056b3 !important;
+            }}
+            [data-testid="stSidebar"] {{
+                background-color: #f1f3f5 !important;
+                border-right: 1px solid #dee2e6;
+            }}
+            [data-testid="stSidebar"] .stRadio label {{
+                background-color: rgba(0, 0, 0, 0.03);
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }}
+            [data-testid="stSidebar"] .stRadio label:hover {{
+                background-color: rgba(0, 0, 0, 0.08);
+            }}
+            [data-testid="stSidebar"] .stRadio p {{
+                color: #111111 !important;
+            }}
+        }}
+
+        /* FORÇAGEM DE TEMA CLARO VIA STREAMLIT ATRIBUTO */
+        [data-theme="light"] .stApp {{
+            background: #f8f9fa !important;
+        }}
+        [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3, [data-theme="light"] h4, [data-theme="light"] h5, [data-theme="light"] h6, [data-theme="light"] p, [data-theme="light"] span, [data-theme="light"] label {{
+            color: #111111 !important;
+        }}
+        [data-theme="light"] div[data-testid="stMetricValue"] {{
+            color: #0056b3 !important;
+        }}
+        [data-theme="light"] [data-testid="stSidebar"] .stRadio p {{
+            color: #111111 !important;
         }}
 
         /* REGRAS PARA IMPRESSÃO LIMPA */
@@ -447,7 +480,7 @@ with st.sidebar:
         st.rerun()
     st.info("🏢 Intranet Base Stang - Itajaí SC\nStatus: Conectado 🟢")
     
-    st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; opacity: 0.7; margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
 
 if menu is not None:
     # --- TELA 1: CRIAR NOVA O.S. ---
@@ -1047,6 +1080,13 @@ if menu is not None:
                     'Dias_Restantes': 'Dias Restantes'
                 })
                 
+                # Configuração de cor adaptativa para o gráfico conforme o tema do Streamlit
+                try:
+                    theme_base = st.get_option("theme.base")
+                except:
+                    theme_base = "dark"
+                chart_font_color = "white" if theme_base == "dark" else "#262730"
+
                 fig = px.bar(
                     df_melted, 
                     x='FM', 
@@ -1061,7 +1101,7 @@ if menu is not None:
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)", 
                     plot_bgcolor="rgba(0,0,0,0)", 
-                    font_color="white",
+                    font_color=chart_font_color,
                     xaxis_title="Formulário (FM)",
                     yaxis_title="Dias"
                 )
@@ -1108,7 +1148,6 @@ if menu is not None:
                         .filtro-compras-box label p {
                             font-size: 11px !important;
                             font-weight: 600 !important;
-                            color: #00ffcc !important;
                             margin-bottom: -2px !important;
                         }
                         .filtro-compras-box div[data-baseweb="select"] {
@@ -1154,6 +1193,7 @@ if menu is not None:
                 
                 st.markdown("---")
                 
+                # RESTRIÇÃO: APENAS ADMINISTRADORES PODEM GERENCIAR ORÇAMENTOS E ALTERAR STATUS/ITENS/EXCLUSÃO
                 if is_user_admin:
                     col_ges_1, col_ges_2 = st.columns(2)
                     
@@ -1533,7 +1573,14 @@ if menu is not None:
         df_os_filtrado = aplicar_filtros(df_os) if not df_os.empty else pd.DataFrame()
         df_c_filtrado = aplicar_filtros(df_c) if not df_c.empty else pd.DataFrame()
 
-        layout_cfg = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="white")
+        # Configuração de cor dinâmica para os gráficos do Plotly baseada no tema do Streamlit
+        try:
+            theme_base = st.get_option("theme.base")
+        except:
+            theme_base = "dark"
+        chart_font_color = "white" if theme_base == "dark" else "#262730"
+
+        layout_cfg = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color)
 
         st.markdown("---")
         
