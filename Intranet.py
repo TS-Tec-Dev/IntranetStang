@@ -7,10 +7,10 @@ import plotly.express as px
 from PIL import Image
 import base64
 
-# Cria diretório de uploads se não existir[cite: 12]
+# Cria diretório de uploads se não existir
 os.makedirs("uploads_orcamentos", exist_ok=True)
 
-# Configuração da página[cite: 12]
+# Configuração da página
 icone_path = "icone.ico" if os.path.exists("icone.ico") else ("logo.png" if os.path.exists("logo.png") else "🔧")
 st.set_page_config(
     page_title="Intranet Stang - Gestão e Manutenção",
@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- AUTO-REFRESH / LOOPING A CADA 3 SEGUNDOS ---[cite: 12]
+# --- AUTO-REFRESH / LOOPING A CADA 3 SEGUNDOS ---
 components.html("""
     <script>
         setInterval(function(){
@@ -34,7 +34,7 @@ hide_streamlit_style = """
     """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Lista completa de menus disponíveis no sistema[cite: 12]
+# Lista completa de menus disponíveis no sistema
 TODOS_MENUS = [
     "📝 Nova O.S.", 
     "📋 Gerenciar O.S.", 
@@ -44,77 +44,8 @@ TODOS_MENUS = [
     "📊 Dashboard"
 ]
 
-# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---[cite: 12]
-base_css = """
-<style>
-    h1, h2, h3, h4, h5, h6, p, span, label {
-        color: #ffffff !important;
-    }
-    .stTextInput input, .stSelectbox select, .stTextArea textarea {
-        background-color: rgba(255, 255, 255, 0.9) !important;
-        color: #000000 !important;
-        font-weight: 500;
-    }
-    .stDataFrame {
-        background-color: rgba(255, 255, 255, 0.95);
-        border-radius: 8px;
-        padding: 5px;
-    }
-    div[data-testid="stMetricValue"] {
-        color: #00ffcc !important;
-    }
-    
-    /* BOTÕES ESCUROS PARA PERFEITA VISIBILIDADE */
-    .stButton button, .stFormSubmitButton button, .stDownloadButton button, button[data-testid="baseButton-secondary"], button[data-testid="baseButton-primary"] {
-        background-color: #1b2a4a !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    }
-    .stButton button:hover, .stFormSubmitButton button:hover, .stDownloadButton button:hover, button[data-testid="baseButton-secondary"]:hover, button[data-testid="baseButton-primary"]:hover {
-        background-color: #2c4370 !important;
-        color: #ffffff !important;
-        border-color: #00ffcc !important;
-    }
-
-    /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) */
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {
-        gap: 8px;
-    }
-    [data-testid="stSidebar"] .stRadio label {
-        background-color: rgba(255, 255, 255, 0.05);
-        padding: 6px 10px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        width: 100%;
-        display: flex;
-        align-items: center;
-    }
-    [data-testid="stSidebar"] .stRadio label:hover {
-        background-color: rgba(255, 255, 255, 0.15);
-    }
-    [data-testid="stSidebar"] .stRadio p {
-        color: #ffffff !important;
-        font-size: 14px !important;
-        margin: 0 !important;
-    }
-
-    /* REGRAS PARA IMPRESSÃO LIMPA */
-    @media print {
-        body {
-            background: #ffffff !important;
-            color: #000000 !important;
-        }
-        .stApp {
-            background: #ffffff !important;
-        }
-        [data-testid="stSidebar"], header, footer, .stButton, .stSelectbox, .no-print {
-            display: none !important;
-        }
-    }
-</style>
-"""
-st.markdown(base_css, unsafe_allow_html=True)
-
+# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---
+background_css = ""
 if os.path.exists("capa.png"):
     with open("capa.png", "rb") as img_file:
         encoded_string = base64.b64encode(img_file.read()).decode()
@@ -127,11 +58,63 @@ if os.path.exists("capa.png"):
             background-position: center;
             background-attachment: fixed;
         }}
+        h1, h2, h3, h4, h5, h6, p, span, label {{
+            color: #ffffff !important;
+        }}
+        .stTextInput input, .stSelectbox select, .stTextArea textarea {{
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            color: #000000 !important;
+            font-weight: 500;
+        }}
+        .stDataFrame {{
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 5px;
+        }}
+        div[data-testid="stMetricValue"] {{
+            color: #00ffcc !important;
+        }}
+        
+        /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) - FUNDO ESCURO */
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
+            gap: 8px;
+        }}
+        [data-testid="stSidebar"] .stRadio label {{
+            background-color: #1e293b !important;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            display: flex;
+            align-items: center;
+        }}
+        [data-testid="stSidebar"] .stRadio label:hover {{
+            background-color: #334155 !important;
+        }}
+        [data-testid="stSidebar"] .stRadio p {{
+            color: #ffffff !important;
+            font-size: 14px !important;
+            margin: 0 !important;
+        }}
+
+        /* REGRAS PARA IMPRESSÃO LIMPA */
+        @media print {{
+            body {{
+                background: #ffffff !important;
+                color: #000000 !important;
+            }}
+            .stApp {{
+                background: #ffffff !important;
+            }}
+            [data-testid="stSidebar"], header, footer, .stButton, .stSelectbox, .no-print {{
+                display: none !important;
+            }}
+        }}
     </style>
     """
-    st.markdown(background_css, unsafe_allow_html=True)
+st.markdown(background_css, unsafe_allow_html=True)
 
-# Bancos de Dados locais CSV[cite: 12]
+# Bancos de Dados locais CSV
 ARQUIVO_OS = "banco_os.csv"
 ARQUIVO_FMS = "banco_fms.csv"
 ARQUIVO_USERS = "banco_usuarios.csv"
@@ -224,7 +207,7 @@ def carregar_banco_os():
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
 
-# --- SISTEMA DE AUTENTICAÇÃO E GERENCIAMENTO NA TELA DE LOGIN ---[cite: 12]
+# --- SISTEMA DE AUTENTICAÇÃO E GERENCIAMENTO NA TELA DE LOGIN ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
     st.session_state.usuario = ""
@@ -406,7 +389,7 @@ if not st.session_state.autenticado:
                     
     st.stop()
 
-# --- DETERMINAR MENUS PERMITIDOS PARA O USUÁRIO LOGADO ---[cite: 12]
+# --- DETERMINAR MENUS PERMITIDOS PARA O USUÁRIO LOGADO ---
 df_users_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
 user_logado_row = df_users_check[df_users_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
 
@@ -419,7 +402,7 @@ if not user_logado_row.empty and pd.notna(user_logado_row.iloc[0].get("Permissoe
 else:
     menus_disponiveis = TODOS_MENUS
 
-# --- BARRA LATERAL (MENU) COM LOGO STANG ---[cite: 12]
+# --- BARRA LATERAL (MENU) COM LOGO STANG ---
 with st.sidebar:
     if os.path.exists("logo.png"):
         st.image("logo.png", use_container_width=True)
@@ -447,7 +430,7 @@ with st.sidebar:
     st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
 
 if menu is not None:
-    # --- TELA 1: CRIAR NOVA O.S. ---[cite: 12]
+    # --- TELA 1: CRIAR NOVA O.S. ---
     if menu == "📝 Nova O.S.":
         st.markdown("# 📝 Abertura de Ordem de Serviço (O.S.)")
         st.markdown("Preencha os dados abaixo para registrar a solicitação de manutenção.")
@@ -534,7 +517,7 @@ if menu is not None:
             cols_exibicao = ["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Prazo_Limite", "Status_Prazo", "Status", "Equipamento", "Descricao", "finalizado_por"]
             st.dataframe(df_os_view[cols_exibicao].sort_values(by="ID", ascending=False), use_container_width=True)
 
-    # --- TELA 2: GERENCIAR, EDITAR, FINALIZAR E EXCLUIR O.S. ---[cite: 12]
+    # --- TELA 2: GERENCIAR, EDITAR, FINALIZAR E EXCLUIR O.S. ---
     elif menu == "📋 Gerenciar O.S.":
         st.markdown("# 📋 Painel de Controle e Gestão de O.S.")
         df = carregar_banco_os()
@@ -685,7 +668,7 @@ if menu is not None:
                         st.success(f"Ordem de Serviço #{os_para_excluir} excluída com sucesso!")
                         st.rerun()
 
-    # --- TELA 3: IMPRIMIR O.S. E RELATÓRIO DE O.S. ---[cite: 12]
+    # --- TELA 3: IMPRIMIR O.S. E RELATÓRIO DE O.S. ---
     elif menu == "🖨️ Imprimir O.S.":
         st.markdown("# 🖨️ Emissão e Relatórios de O.S.")
         df = carregar_banco_os()
@@ -927,7 +910,7 @@ if menu is not None:
 """
                     components.html(print_rel_html, height=750, scrolling=True)
 
-    # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---[cite: 12]
+    # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---
     elif menu == "📅 Formulários e Prazos (FMs)":
         st.markdown("# 📅 Gestão de Conformidade de Formulários (FMs)")
         
@@ -1066,7 +1049,7 @@ if menu is not None:
             else:
                 st.info("Cadastre o primeiro formulário na aba anterior para visualizar os cálculos automáticos e gráficos.")
 
-    # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---[cite: 12]
+    # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---
     elif menu == "🛒 Solicitações de Compras":
         st.markdown("# 🛒 Solicitações de Materiais e Insumos")
         
@@ -1476,7 +1459,7 @@ if menu is not None:
 """
                 components.html(print_compra_html, height=750, scrolling=True)
 
-    # --- TELA 6: DASHBOARD ESTILO POWER BI (O.S. & COMPRAS) ---[cite: 12]
+    # --- TELA 6: DASHBOARD ESTILO POWER BI (O.S. & COMPRAS) ---
     elif menu == "📊 Dashboard":
         st.markdown("# 📊 Dashboard")
         st.markdown("Visão analítica de Ordens de Serviço e Compras. Utilize os filtros abaixo para segmentar os dados. Você pode clicar nas legendas dos gráficos para isolar ou remover categorias específicas.")
@@ -1614,7 +1597,7 @@ if menu is not None:
                 with g_c_3:
                     top_itens = df_c_filtrado.groupby('Item')['Quantidade'].sum().reset_index().sort_values(by='Quantidade', ascending=False).head(10)
                     fig_top_itens = px.bar(top_itens, x='Quantidade', y='Item', orientation='h', title="Top 10 Itens Mais Solicitados", text='Quantidade')
-                    fig_top_itens.update_layout(**layout_cfg, yaxis={'categoryorder':'total ascending'})
+                    fig_top_itens.update_layout(**layout__cfg if 'layout__cfg' in locals() else layout_cfg, yaxis={'categoryorder':'total ascending'})
                     st.plotly_chart(fig_top_itens, use_container_width=True)
                     
                 with g_c_4:
