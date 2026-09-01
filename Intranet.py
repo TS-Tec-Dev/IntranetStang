@@ -7,10 +7,10 @@ import plotly.express as px
 from PIL import Image
 import base64
 
-# Cria diretório de uploads se não existir
+# Cria diretório de uploads se não existir[cite: 12]
 os.makedirs("uploads_orcamentos", exist_ok=True)
 
-# Configuração da página
+# Configuração da página[cite: 12]
 icone_path = "icone.ico" if os.path.exists("icone.ico") else ("logo.png" if os.path.exists("logo.png") else "🔧")
 st.set_page_config(
     page_title="Intranet Stang - Gestão e Manutenção",
@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- AUTO-REFRESH / LOOPING A CADA 3 SEGUNDOS ---
+# --- AUTO-REFRESH / LOOPING A CADA 3 SEGUNDOS ---[cite: 12]
 components.html("""
     <script>
         setInterval(function(){
@@ -34,7 +34,7 @@ hide_streamlit_style = """
     """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Lista completa de menus disponíveis no sistema
+# Lista completa de menus disponíveis no sistema[cite: 12]
 TODOS_MENUS = [
     "📝 Nova O.S.", 
     "📋 Gerenciar O.S.", 
@@ -44,51 +44,39 @@ TODOS_MENUS = [
     "📊 Dashboard"
 ]
 
-# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A TEMA ESCURO (MENU E ABAS) ---
-background_css = ""
-if os.path.exists("capa.png"):
-    with open("capa.png", "rb") as img_file:
-        encoded_string = base64.b64encode(img_file.read()).decode()
-    background_css = f"""
-    <style>
-        .stApp {{
-            background: linear-gradient(rgba(0, 30, 80, 0.85), rgba(0, 15, 40, 0.90)), 
-                        url("data:image/png;base64,{encoded_string}");
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-        }}
-        h1, h2, h3, h4, h5, h6, p, span, label {{
-            color: #ffffff !important;
-        }}
-        .stTextInput input, .stSelectbox select, .stTextArea textarea {{
-            background-color: rgba(255, 255, 255, 0.9) !important;
-            color: #000000 !important;
-            font-weight: 500;
-        }}
-        .stDataFrame {{
-            background-color: rgba(255, 255, 255, 0.95);
-            border-radius: 8px;
-            padding: 5px;
-        }}
-        div[data-testid="stMetricValue"] {{
-            color: #00ffcc !important;
-        }}
-    </style>
-    """
-
-# CSS Global para garantir Menu de Seleção (Sidebar) e Botões de Abas Escuros
-global_dark_elements_css = """
+# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---[cite: 12]
+base_css = """
 <style>
-    /* BARRA DO MENU DE SELEÇÃO (SIDEBAR) ESCURA */
-    [data-testid="stSidebar"] {
-        background-color: #0b192c !important;
-    }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] h4, [data-testid="stSidebar"] h5, [data-testid="stSidebar"] h6, 
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
+    h1, h2, h3, h4, h5, h6, p, span, label {
         color: #ffffff !important;
     }
+    .stTextInput input, .stSelectbox select, .stTextArea textarea {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        color: #000000 !important;
+        font-weight: 500;
+    }
+    .stDataFrame {
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 8px;
+        padding: 5px;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #00ffcc !important;
+    }
+    
+    /* BOTÕES ESCUROS PARA PERFEITA VISIBILIDADE */
+    .stButton button, .stFormSubmitButton button, .stDownloadButton button, button[data-testid="baseButton-secondary"], button[data-testid="baseButton-primary"] {
+        background-color: #1b2a4a !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+    .stButton button:hover, .stFormSubmitButton button:hover, .stDownloadButton button:hover, button[data-testid="baseButton-secondary"]:hover, button[data-testid="baseButton-primary"]:hover {
+        background-color: #2c4370 !important;
+        color: #ffffff !important;
+        border-color: #00ffcc !important;
+    }
+
+    /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) */
     [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {
         gap: 8px;
     }
@@ -109,35 +97,6 @@ global_dark_elements_css = """
         font-size: 14px !important;
         margin: 0 !important;
     }
-    [data-testid="stSidebar"] .stButton button {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    }
-    [data-testid="stSidebar"] .stButton button:hover {
-        background-color: #334155 !important;
-        border-color: #00ffcc !important;
-    }
-
-    /* BOTÕES DE TODAS AS ABAS (TABS) ESCUROS */
-    button[data-baseweb="tab"] {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border-radius: 6px 6px 0px 0px !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        padding: 10px 16px !important;
-        font-weight: 600 !important;
-    }
-    button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
-        color: #ffffff !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #002244 !important;
-        border-bottom: 3px solid #00ffcc !important;
-    }
-    button[data-baseweb="tab"]:hover {
-        background-color: #334155 !important;
-    }
 
     /* REGRAS PARA IMPRESSÃO LIMPA */
     @media print {
@@ -154,11 +113,25 @@ global_dark_elements_css = """
     }
 </style>
 """
+st.markdown(base_css, unsafe_allow_html=True)
 
-st.markdown(background_css, unsafe_allow_html=True)
-st.markdown(global_dark_elements_css, unsafe_allow_html=True)
+if os.path.exists("capa.png"):
+    with open("capa.png", "rb") as img_file:
+        encoded_string = base64.b64encode(img_file.read()).decode()
+    background_css = f"""
+    <style>
+        .stApp {{
+            background: linear-gradient(rgba(0, 30, 80, 0.85), rgba(0, 15, 40, 0.90)), 
+                        url("data:image/png;base64,{encoded_string}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+    </style>
+    """
+    st.markdown(background_css, unsafe_allow_html=True)
 
-# Bancos de Dados locais CSV
+# Bancos de Dados locais CSV[cite: 12]
 ARQUIVO_OS = "banco_os.csv"
 ARQUIVO_FMS = "banco_fms.csv"
 ARQUIVO_USERS = "banco_usuarios.csv"
@@ -251,7 +224,7 @@ def carregar_banco_os():
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
 
-# --- SISTEMA DE AUTENTICAÇÃO E GERENCIAMENTO NA TELA DE LOGIN ---
+# --- SISTEMA DE AUTENTICAÇÃO E GERENCIAMENTO NA TELA DE LOGIN ---[cite: 12]
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
     st.session_state.usuario = ""
@@ -433,7 +406,7 @@ if not st.session_state.autenticado:
                     
     st.stop()
 
-# --- DETERMINAR MENUS PERMITIDOS PARA O USUÁRIO LOGADO ---
+# --- DETERMINAR MENUS PERMITIDOS PARA O USUÁRIO LOGADO ---[cite: 12]
 df_users_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
 user_logado_row = df_users_check[df_users_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
 
@@ -446,7 +419,7 @@ if not user_logado_row.empty and pd.notna(user_logado_row.iloc[0].get("Permissoe
 else:
     menus_disponiveis = TODOS_MENUS
 
-# --- BARRA LATERAL (MENU) COM LOGO STANG ---
+# --- BARRA LATERAL (MENU) COM LOGO STANG ---[cite: 12]
 with st.sidebar:
     if os.path.exists("logo.png"):
         st.image("logo.png", use_container_width=True)
@@ -474,7 +447,7 @@ with st.sidebar:
     st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
 
 if menu is not None:
-    # --- TELA 1: CRIAR NOVA O.S. ---
+    # --- TELA 1: CRIAR NOVA O.S. ---[cite: 12]
     if menu == "📝 Nova O.S.":
         st.markdown("# 📝 Abertura de Ordem de Serviço (O.S.)")
         st.markdown("Preencha os dados abaixo para registrar a solicitação de manutenção.")
@@ -561,7 +534,7 @@ if menu is not None:
             cols_exibicao = ["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Prazo_Limite", "Status_Prazo", "Status", "Equipamento", "Descricao", "finalizado_por"]
             st.dataframe(df_os_view[cols_exibicao].sort_values(by="ID", ascending=False), use_container_width=True)
 
-    # --- TELA 2: GERENCIAR, EDITAR, FINALIZAR E EXCLUIR O.S. ---
+    # --- TELA 2: GERENCIAR, EDITAR, FINALIZAR E EXCLUIR O.S. ---[cite: 12]
     elif menu == "📋 Gerenciar O.S.":
         st.markdown("# 📋 Painel de Controle e Gestão de O.S.")
         df = carregar_banco_os()
@@ -712,7 +685,7 @@ if menu is not None:
                         st.success(f"Ordem de Serviço #{os_para_excluir} excluída com sucesso!")
                         st.rerun()
 
-    # --- TELA 3: IMPRIMIR O.S. E RELATÓRIO DE O.S. ---
+    # --- TELA 3: IMPRIMIR O.S. E RELATÓRIO DE O.S. ---[cite: 12]
     elif menu == "🖨️ Imprimir O.S.":
         st.markdown("# 🖨️ Emissão e Relatórios de O.S.")
         df = carregar_banco_os()
@@ -954,7 +927,7 @@ if menu is not None:
 """
                     components.html(print_rel_html, height=750, scrolling=True)
 
-    # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---
+    # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---[cite: 12]
     elif menu == "📅 Formulários e Prazos (FMs)":
         st.markdown("# 📅 Gestão de Conformidade de Formulários (FMs)")
         
@@ -1093,7 +1066,7 @@ if menu is not None:
             else:
                 st.info("Cadastre o primeiro formulário na aba anterior para visualizar os cálculos automáticos e gráficos.")
 
-    # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---
+    # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---[cite: 12]
     elif menu == "🛒 Solicitações de Compras":
         st.markdown("# 🛒 Solicitações de Materiais e Insumos")
         
@@ -1503,7 +1476,7 @@ if menu is not None:
 """
                 components.html(print_compra_html, height=750, scrolling=True)
 
-    # --- TELA 6: DASHBOARD ESTILO POWER BI (O.S. & COMPRAS) ---
+    # --- TELA 6: DASHBOARD ESTILO POWER BI (O.S. & COMPRAS) ---[cite: 12]
     elif menu == "📊 Dashboard":
         st.markdown("# 📊 Dashboard")
         st.markdown("Visão analítica de Ordens de Serviço e Compras. Utilize os filtros abaixo para segmentar os dados. Você pode clicar nas legendas dos gráficos para isolar ou remover categorias específicas.")
