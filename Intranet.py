@@ -7,6 +7,20 @@ import plotly.express as px
 from PIL import Image
 import base64
 
+# --- FORÇAR TEMA ESCURO (O tema claro fica idêntico ao escuro) ---
+os.makedirs(".streamlit", exist_ok=True)
+config_path = os.path.join(".streamlit", "config.toml")
+if not os.path.exists(config_path):
+    with open(config_path, "w") as f:
+        f.write(
+            '[theme]\n'
+            'base="dark"\n'
+            'primaryColor="#00ffcc"\n'
+            'backgroundColor="#000f28"\n'
+            'secondaryBackgroundColor="#001e50"\n'
+            'textColor="#ffffff"\n'
+        )
+
 # Cria diretório de uploads se não existir
 os.makedirs("uploads_orcamentos", exist_ok=True)
 
@@ -44,7 +58,7 @@ TODOS_MENUS = [
     "📊 Dashboard"
 ]
 
-# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A TEMA ESCURO (MENU E ABAS) ---
+# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---
 background_css = ""
 if os.path.exists("capa.png"):
     with open("capa.png", "rb") as img_file:
@@ -74,89 +88,45 @@ if os.path.exists("capa.png"):
         div[data-testid="stMetricValue"] {{
             color: #00ffcc !important;
         }}
+        
+        /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) */
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
+            gap: 8px;
+        }}
+        [data-testid="stSidebar"] .stRadio label {{
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            display: flex;
+            align-items: center;
+        }}
+        [data-testid="stSidebar"] .stRadio label:hover {{
+            background-color: rgba(255, 255, 255, 0.15);
+        }}
+        [data-testid="stSidebar"] .stRadio p {{
+            color: #ffffff !important;
+            font-size: 14px !important;
+            margin: 0 !important;
+        }}
+
+        /* REGRAS PARA IMPRESSÃO LIMPA */
+        @media print {{
+            body {{
+                background: #ffffff !important;
+                color: #000000 !important;
+            }}
+            .stApp {{
+                background: #ffffff !important;
+            }}
+            [data-testid="stSidebar"], header, footer, .stButton, .stSelectbox, .no-print {{
+                display: none !important;
+            }}
+        }}
     </style>
     """
-
-# CSS Global para garantir Menu de Seleção (Sidebar) e Botões de Abas Escuros
-global_dark_elements_css = """
-<style>
-    /* BARRA DO MENU DE SELEÇÃO (SIDEBAR) ESCURA */
-    [data-testid="stSidebar"] {
-        background-color: #0b192c !important;
-    }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] h4, [data-testid="stSidebar"] h5, [data-testid="stSidebar"] h6, 
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
-        color: #ffffff !important;
-    }
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {
-        gap: 8px;
-    }
-    [data-testid="stSidebar"] .stRadio label {
-        background-color: rgba(255, 255, 255, 0.05);
-        padding: 6px 10px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        width: 100%;
-        display: flex;
-        align-items: center;
-    }
-    [data-testid="stSidebar"] .stRadio label:hover {
-        background-color: rgba(255, 255, 255, 0.15);
-    }
-    [data-testid="stSidebar"] .stRadio p {
-        color: #ffffff !important;
-        font-size: 14px !important;
-        margin: 0 !important;
-    }
-    [data-testid="stSidebar"] .stButton button {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    }
-    [data-testid="stSidebar"] .stButton button:hover {
-        background-color: #334155 !important;
-        border-color: #00ffcc !important;
-    }
-
-    /* BOTÕES DE TODAS AS ABAS (TABS) ESCUROS */
-    button[data-baseweb="tab"] {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border-radius: 6px 6px 0px 0px !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        padding: 10px 16px !important;
-        font-weight: 600 !important;
-    }
-    button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
-        color: #ffffff !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #002244 !important;
-        border-bottom: 3px solid #00ffcc !important;
-    }
-    button[data-baseweb="tab"]:hover {
-        background-color: #334155 !important;
-    }
-
-    /* REGRAS PARA IMPRESSÃO LIMPA */
-    @media print {
-        body {
-            background: #ffffff !important;
-            color: #000000 !important;
-        }
-        .stApp {
-            background: #ffffff !important;
-        }
-        [data-testid="stSidebar"], header, footer, .stButton, .stSelectbox, .no-print {
-            display: none !important;
-        }
-    }
-</style>
-"""
-
 st.markdown(background_css, unsafe_allow_html=True)
-st.markdown(global_dark_elements_css, unsafe_allow_html=True)
 
 # Bancos de Dados locais CSV
 ARQUIVO_OS = "banco_os.csv"
