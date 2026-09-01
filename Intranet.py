@@ -44,36 +44,46 @@ TODOS_MENUS = [
     "📊 Dashboard"
 ]
 
-# --- ESTILIZAÇÃO CSS PROFISSIONAL ( SUPORTE A TEMA ESCURO E CLARO ) ---
+# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---
 background_css = ""
 if os.path.exists("capa.png"):
     with open("capa.png", "rb") as img_file:
         encoded_string = base64.b64encode(img_file.read()).decode()
     background_css = f"""
     <style>
-        /* TEMA ESCURO (Mantido intacto conforme solicitado) */
-        .stApp {{
-            background: linear-gradient(rgba(0, 30, 80, 0.85), rgba(0, 15, 40, 0.90)), 
-                        url("data:image/png;base64,{encoded_string}");
+        /* Configuração base da página */
+        body {{
+            position: relative;
+            margin: 0;
+            min-height: 100vh;
+        }}
+
+        /* Camada da imagem de fundo posicionada atrás de tudo */
+        body::before {{
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-image: url('data:image/png;base64,{encoded_string}');
             background-size: cover;
             background-position: center;
-            background-attachment: fixed;
+            z-index: -1; /* Garante que fique estritamente no fundo */
+            pointer-events: none;
         }}
-        h1, h2, h3, h4, h5, h6, p, span, label {{
-            color: #ffffff !important;
+
+        /* --- TEMA CLARO --- */
+        /* Deixa a imagem bem opaca/transparente para as letras se destacarem */
+        body.light-theme::before, 
+        body:not(.dark-theme)::before {{
+            opacity: 0.08; /* Ajuste entre 0.05 e 0.12 conforme preferência */
         }}
-        .stTextInput input, .stSelectbox select, .stTextArea textarea {{
-            background-color: rgba(255, 255, 255, 0.9) !important;
-            color: #000000 !important;
-            font-weight: 500;
-        }}
-        .stDataFrame {{
-            background-color: rgba(255, 255, 255, 0.95);
-            border-radius: 8px;
-            padding: 5px;
-        }}
-        div[data-testid="stMetricValue"] {{
-            color: #00ffcc !important;
+
+        /* --- TEMA ESCURO --- */
+        /* Permite que a imagem apareça um pouco mais, combinando com o fundo escuro */
+        body.dark-theme::before {{
+            opacity: 0.18; /* Ajuste para dar destaque à marca sem sumir com os textos */
         }}
         
         /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) */
@@ -81,73 +91,14 @@ if os.path.exists("capa.png"):
             gap: 8px;
         }}
         [data-testid="stSidebar"] .stRadio label {{
-            background-color: rgba(255, 255, 255, 0.05);
             padding: 6px 10px;
             border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
             width: 100%;
             display: flex;
             align-items: center;
         }}
         [data-testid="stSidebar"] .stRadio label:hover {{
-            background-color: rgba(255, 255, 255, 0.15);
-        }}
-        [data-testid="stSidebar"] .stRadio p {{
-            color: #ffffff !important;
-            font-size: 14px !important;
-            margin: 0 !important;
-        }}
-
-        /* --- SUPORTE AO TEMA CLARO (LETRAS ESCURAS E LEGÍVEIS, GRADES E ELEMENTOS) --- */
-        @media (prefers-color-scheme: light) {{
-            .stApp {{
-                background: #f8f9fa !important;
-            }}
-            h1, h2, h3, h4, h5, h6, p, span, label {{
-                color: #111111 !important;
-            }}
-            .stTextInput input, .stSelectbox select, .stTextArea textarea {{
-                background-color: #ffffff !important;
-                color: #000000 !important;
-                border: 1px solid #ced4da !important;
-                font-weight: 500;
-            }}
-            .stDataFrame {{
-                background-color: #ffffff !important;
-                color: #000000 !important;
-                border: 1px solid #dee2e6;
-            }}
-            div[data-testid="stMetricValue"] {{
-                color: #0056b3 !important;
-            }}
-            [data-testid="stSidebar"] {{
-                background-color: #f1f3f5 !important;
-                border-right: 1px solid #dee2e6;
-            }}
-            [data-testid="stSidebar"] .stRadio label {{
-                background-color: rgba(0, 0, 0, 0.03);
-                border: 1px solid rgba(0, 0, 0, 0.1);
-            }}
-            [data-testid="stSidebar"] .stRadio label:hover {{
-                background-color: rgba(0, 0, 0, 0.08);
-            }}
-            [data-testid="stSidebar"] .stRadio p {{
-                color: #111111 !important;
-            }}
-        }}
-
-        /* FORÇAGEM DE TEMA CLARO VIA STREAMLIT ATRIBUTO */
-        [data-theme="light"] .stApp {{
-            background: #f8f9fa !important;
-        }}
-        [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3, [data-theme="light"] h4, [data-theme="light"] h5, [data-theme="light"] h6, [data-theme="light"] p, [data-theme="light"] span, [data-theme="light"] label {{
-            color: #111111 !important;
-        }}
-        [data-theme="light"] div[data-testid="stMetricValue"] {{
-            color: #0056b3 !important;
-        }}
-        [data-theme="light"] [data-testid="stSidebar"] .stRadio p {{
-            color: #111111 !important;
+            background-color: rgba(0, 0, 0, 0.08);
         }}
 
         /* REGRAS PARA IMPRESSÃO LIMPA */
@@ -480,7 +431,7 @@ with st.sidebar:
         st.rerun()
     st.info("🏢 Intranet Base Stang - Itajaí SC\nStatus: Conectado 🟢")
     
-    st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; opacity: 0.7; margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; color: rgba(100, 100, 100, 0.7); margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
 
 if menu is not None:
     # --- TELA 1: CRIAR NOVA O.S. ---
@@ -921,7 +872,7 @@ if menu is not None:
                     <h3 style="margin: 0; color: #000 !important; font-size: 16px;">Relatório Geral de Ordens de Serviço (O.S.)</h3>
                 </td>
                 <td style="width: 25%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
-                    <b></b><br>Data: {datetime.now().strftime('%d/%m/%Y')}
+                    Data: {datetime.now().strftime('%d/%m/%Y')}
                 </td>
             </tr>
         </table>
@@ -1080,13 +1031,6 @@ if menu is not None:
                     'Dias_Restantes': 'Dias Restantes'
                 })
                 
-                # Configuração de cor adaptativa para o gráfico conforme o tema do Streamlit
-                try:
-                    theme_base = st.get_option("theme.base")
-                except:
-                    theme_base = "dark"
-                chart_font_color = "white" if theme_base == "dark" else "#262730"
-
                 fig = px.bar(
                     df_melted, 
                     x='FM', 
@@ -1101,7 +1045,6 @@ if menu is not None:
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)", 
                     plot_bgcolor="rgba(0,0,0,0)", 
-                    font_color=chart_font_color,
                     xaxis_title="Formulário (FM)",
                     yaxis_title="Dias"
                 )
@@ -1143,19 +1086,6 @@ if menu is not None:
                 df_view['Orcamento_Assinado'] = df_view['Orcamento_Assinado'].apply(formatar_orcamento)
                 df_view['Data_Apenas'] = df_view['Data_Solicitacao'].astype(str).str.split(" ").str[0]
 
-                st.markdown("""
-                    <style>
-                        .filtro-compras-box label p {
-                            font-size: 11px !important;
-                            font-weight: 600 !important;
-                            margin-bottom: -2px !important;
-                        }
-                        .filtro-compras-box div[data-baseweb="select"] {
-                            min-height: 30px !important;
-                        }
-                    </style>
-                """, unsafe_allow_html=True)
-
                 st.markdown("<div class='filtro-compras-box'>", unsafe_allow_html=True)
                 col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
                 
@@ -1193,7 +1123,6 @@ if menu is not None:
                 
                 st.markdown("---")
                 
-                # RESTRIÇÃO: APENAS ADMINISTRADORES PODEM GERENCIAR ORÇAMENTOS E ALTERAR STATUS/ITENS/EXCLUSÃO
                 if is_user_admin:
                     col_ges_1, col_ges_2 = st.columns(2)
                     
@@ -1522,7 +1451,7 @@ if menu is not None:
     # --- TELA 6: DASHBOARD ESTILO POWER BI (O.S. & COMPRAS) ---
     elif menu == "📊 Dashboard":
         st.markdown("# 📊 Dashboard")
-        st.markdown("Visão analítica de Ordens de Serviço e Compras. Utilize os filtros abaixo para segmentar os dados. Você pode clicar nas legendas dos gráficos para isolar ou remover categorias específicas.")
+        st.markdown("Visão analítica de Ordens de Serviço e Compras. Utilize os filtros abaixo para segmentar os dados.")
         
         df_os = carregar_banco_os()
         df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
@@ -1573,15 +1502,6 @@ if menu is not None:
         df_os_filtrado = aplicar_filtros(df_os) if not df_os.empty else pd.DataFrame()
         df_c_filtrado = aplicar_filtros(df_c) if not df_c.empty else pd.DataFrame()
 
-        # Configuração de cor dinâmica para os gráficos do Plotly baseada no tema do Streamlit
-        try:
-            theme_base = st.get_option("theme.base")
-        except:
-            theme_base = "dark"
-        chart_font_color = "white" if theme_base == "dark" else "#262730"
-
-        layout_cfg = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color)
-
         st.markdown("---")
         
         tab_dashboard_os, tab_dashboard_compras = st.tabs(["🔧 Análise de O.S.", "🛒 Análise de Compras"])
@@ -1608,26 +1528,24 @@ if menu is not None:
                 with g_os_1:
                     fig_os_status = px.pie(df_os_filtrado, names='Status', title="Distribuição por Status", hole=0.4, 
                                            color='Status', color_discrete_map={'Finalizada':'#00cc96', 'Em Andamento':'#ffa15a', 'Em Aberto':'#ef553b'})
-                    fig_os_status.update_layout(**layout_cfg)
                     st.plotly_chart(fig_os_status, use_container_width=True)
                     
                 with g_os_2:
                     os_setor = df_os_filtrado['Setor'].value_counts().reset_index()
                     os_setor.columns = ['Setor', 'Quantidade']
                     fig_os_setor = px.bar(os_setor, x='Setor', y='Quantidade', title="Volume de O.S. por Setor", text='Quantidade', color='Setor')
-                    fig_os_setor.update_layout(**layout_cfg, showlegend=False)
+                    fig_os_setor.update_layout(showlegend=False)
                     st.plotly_chart(fig_os_setor, use_container_width=True)
 
                 g_os_3, g_os_4 = st.columns(2)
                 with g_os_3:
                     fig_os_tipo = px.histogram(df_os_filtrado, x='Tipo_Manutencao', title="Tipo de Manutenção", color='Tipo_Manutencao', text_auto=True)
-                    fig_os_tipo.update_layout(**layout_cfg, bargap=0.2)
+                    fig_os_tipo.update_layout(bargap=0.2)
                     st.plotly_chart(fig_os_tipo, use_container_width=True)
                     
                 with g_os_4:
                     fig_os_prio = px.funnel(df_os_filtrado.groupby('Prioridade').size().reset_index(name='Contagem'), 
                                             x='Contagem', y='Prioridade', title="Funil de Prioridades")
-                    fig_os_prio.update_layout(**layout_cfg)
                     st.plotly_chart(fig_os_prio, use_container_width=True)
 
         with tab_dashboard_compras:
@@ -1651,24 +1569,23 @@ if menu is not None:
                 
                 with g_c_1:
                     fig_c_cat = px.pie(df_c_filtrado, names='Categoria', title="Itens por Categoria", hole=0.4, color='Categoria')
-                    fig_c_cat.update_layout(**layout_cfg)
                     fig_c_cat.update_traces(textposition='inside', textinfo='percent+label')
                     st.plotly_chart(fig_c_cat, use_container_width=True)
                     
                 with g_c_2:
                     fig_c_status = px.histogram(df_c_filtrado, x='Status', title="Pedidos por Status", color='Status', text_auto=True)
-                    fig_c_status.update_layout(**layout_cfg, bargap=0.2)
+                    fig_c_status.update_layout(bargap=0.2)
                     st.plotly_chart(fig_c_status, use_container_width=True)
 
                 g_c_3, g_c_4 = st.columns([1.5, 1])
                 with g_c_3:
                     top_itens = df_c_filtrado.groupby('Item')['Quantidade'].sum().reset_index().sort_values(by='Quantidade', ascending=False).head(10)
                     fig_top_itens = px.bar(top_itens, x='Quantidade', y='Item', orientation='h', title="Top 10 Itens Mais Solicitados", text='Quantidade')
-                    fig_top_itens.update_layout(**layout_cfg, yaxis={'categoryorder':'total ascending'})
+                    fig_top_itens.update_layout(yaxis={'categoryorder':'total ascending'})
                     st.plotly_chart(fig_top_itens, use_container_width=True)
                     
                 with g_c_4:
                     c_setor = df_c_filtrado.groupby('Setor')['Quantidade'].sum().reset_index()
                     fig_c_setor = px.bar(c_setor, x='Setor', y='Quantidade', title="Itens Solicitados por Setor", color='Setor')
-                    fig_c_setor.update_layout(**layout_cfg, showlegend=False)
+                    fig_c_setor.update_layout(showlegend=False)
                     st.plotly_chart(fig_c_setor, use_container_width=True)
