@@ -44,7 +44,7 @@ TODOS_MENUS = [
     "📊 Dashboard"
 ]
 
-# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---
+# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A TEMAS (CLARO/ESCURO) ---
 background_css = ""
 if os.path.exists("capa.png"):
     with open("capa.png", "rb") as img_file:
@@ -57,9 +57,6 @@ if os.path.exists("capa.png"):
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
-        }}
-        h1, h2, h3, h4, h5, h6, p, span, label {{
-            color: #ffffff !important;
         }}
         .stTextInput input, .stSelectbox select, .stTextArea textarea {{
             background-color: rgba(255, 255, 255, 0.9) !important;
@@ -75,31 +72,21 @@ if os.path.exists("capa.png"):
             color: #00ffcc !important;
         }}
         
-        /* COR DO FUNDO DO PAINEL LATERAL (SIDEBAR) PARA ESCURA */
-        [data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child {{
-            background-color: #061122 !important;
-        }}
-        
-        /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) */
+        /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) COM SUPORTE A TEMA */
         [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
             gap: 8px;
         }}
         [data-testid="stSidebar"] .stRadio label {{
-            background-color: rgba(255, 255, 255, 0.05);
+            background-color: rgba(255, 255, 255, 0.08);
             padding: 6px 10px;
             border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             width: 100%;
             display: flex;
             align-items: center;
         }}
         [data-testid="stSidebar"] .stRadio label:hover {{
-            background-color: rgba(255, 255, 255, 0.15);
-        }}
-        [data-testid="stSidebar"] .stRadio p {{
-            color: #ffffff !important;
-            font-size: 14px !important;
-            margin: 0 !important;
+            background-color: rgba(255, 255, 255, 0.2);
         }}
 
         /* REGRAS PARA IMPRESSÃO LIMPA */
@@ -432,7 +419,7 @@ with st.sidebar:
         st.rerun()
     st.info("🏢 Intranet Base Stang - Itajaí SC\nStatus: Conectado 🟢")
     
-    st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; opacity: 0.7; margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
 
 if menu is not None:
     # --- TELA 1: CRIAR NOVA O.S. ---
@@ -1043,10 +1030,10 @@ if menu is not None:
                     color_discrete_map={'Prazo': '#FF7F0E', 'Dias Restantes': '#1F77B4'}
                 )
                 fig.update_traces(texttemplate='%{text}', textposition='outside')
+                # Layout adaptável a temas (sem cor de fonte fixa)
                 fig.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)", 
                     plot_bgcolor="rgba(0,0,0,0)", 
-                    font_color="white",
                     xaxis_title="Formulário (FM)",
                     yaxis_title="Dias"
                 )
@@ -1093,7 +1080,6 @@ if menu is not None:
                         .filtro-compras-box label p {
                             font-size: 11px !important;
                             font-weight: 600 !important;
-                            color: #00ffcc !important;
                             margin-bottom: -2px !important;
                         }
                         .filtro-compras-box div[data-baseweb="select"] {
@@ -1126,7 +1112,7 @@ if menu is not None:
                     df_view = df_view[df_view['Data_Apenas'] == filtro_data]
                 if filtro_solic != "Todos":
                     df_view = df_view[df_view['Solicitante'] == filtro_solic]
-                if filtro_cat != "Todos":
+                if filtro_cat != "Todas":
                     df_view = df_view[df_view['Categoria'] == filtro_cat]
                 if filtro_item != "Todos":
                     df_view = df_view[df_view['Item'] == filtro_item]
@@ -1464,10 +1450,10 @@ if menu is not None:
 """
                 components.html(print_compra_html, height=750, scrolling=True)
 
-    # --- TELA 6: DASHBOARD ESTILO POWER BI (O.S. & COMPRAS) ---
+    # --- TELA 6: DASHBOARD (O.S. & COMPRAS) ---
     elif menu == "📊 Dashboard":
         st.markdown("# 📊 Dashboard")
-        st.markdown("Visão analítica de Ordens de Serviço e Compras. Utilize os filtros abaixo para segmentar os dados. Você pode clicar nas legendas dos gráficos para isolar ou remover categorias específicas.")
+        st.markdown("Visão analítica de Ordens de Serviço e Compras. Utilize os filtros abaixo para segmentar os dados.")
         
         df_os = carregar_banco_os()
         df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
@@ -1518,7 +1504,8 @@ if menu is not None:
         df_os_filtrado = aplicar_filtros(df_os) if not df_os.empty else pd.DataFrame()
         df_c_filtrado = aplicar_filtros(df_c) if not df_c.empty else pd.DataFrame()
 
-        layout_cfg = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="white")
+        # Layout do Plotly limpo e adaptável ao tema (sem forçar cor de fonte estática)
+        layout_cfg = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
 
         st.markdown("---")
         
@@ -1595,7 +1582,7 @@ if menu is not None:
                     
                 with g_c_2:
                     fig_c_status = px.histogram(df_c_filtrado, x='Status', title="Pedidos por Status", color='Status', text_auto=True)
-                    fig_c_status.update_layout(**layout_cfg, bargap=0.2)
+                    fig_c_status.update_layout(**layout_kw := layout_cfg, bargap=0.2)
                     st.plotly_chart(fig_c_status, use_container_width=True)
 
                 g_c_3, g_c_4 = st.columns([1.5, 1])
