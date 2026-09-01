@@ -44,13 +44,14 @@ TODOS_MENUS = [
     "📊 Dashboard"
 ]
 
-# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A IMPRESSÃO LIMPA ---
+# --- ESTILIZAÇÃO CSS PROFISSIONAL ( SUPORTE A TEMA ESCURO E CLARO + IMPRESSÃO ) ---
 background_css = ""
 if os.path.exists("capa.png"):
     with open("capa.png", "rb") as img_file:
         encoded_string = base64.b64encode(img_file.read()).decode()
     background_css = f"""
     <style>
+        /* TEMA ESCURO (Padrão) */
         .stApp {{
             background: linear-gradient(rgba(0, 30, 80, 0.85), rgba(0, 15, 40, 0.90)), 
                         url("data:image/png;base64,{encoded_string}");
@@ -75,7 +76,7 @@ if os.path.exists("capa.png"):
             color: #00ffcc !important;
         }}
         
-        /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) */
+        /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) - ESCURO */
         [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
             gap: 8px;
         }}
@@ -95,6 +96,51 @@ if os.path.exists("capa.png"):
             color: #ffffff !important;
             font-size: 14px !important;
             margin: 0 !important;
+        }}
+
+        /* TEMA CLARO (LIGHT THEME) */
+        @media (prefers-color-scheme: light) {{
+            .stApp {{
+                background: linear-gradient(rgba(240, 244, 248, 0.90), rgba(225, 232, 240, 0.95)), 
+                            url("data:image/png;base64,{encoded_string}");
+                background-size: cover;
+                background-position: center;
+                background-attachment: fixed;
+            }}
+            h1, h2, h3, h4, h5, h6, p, span, label {{
+                color: #1f2937 !important;
+            }}
+            .stTextInput input, .stSelectbox select, .stTextArea textarea {{
+                background-color: #ffffff !important;
+                color: #111827 !important;
+                border: 1px solid #cbd5e1 !important;
+                font-weight: 500;
+            }}
+            .stDataFrame {{
+                background-color: rgba(255, 255, 255, 0.95);
+                border-radius: 8px;
+                padding: 5px;
+            }}
+            div[data-testid="stMetricValue"] {{
+                color: #0284c7 !important;
+            }}
+            [data-testid="stSidebar"] .stRadio label {{
+                background-color: rgba(0, 0, 0, 0.03);
+                padding: 6px 10px;
+                border-radius: 6px;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+                width: 100%;
+                display: flex;
+                align-items: center;
+            }}
+            [data-testid="stSidebar"] .stRadio label:hover {{
+                background-color: rgba(0, 0, 0, 0.08);
+            }}
+            [data-testid="stSidebar"] .stRadio p {{
+                color: #1f2937 !important;
+                font-size: 14px !important;
+                margin: 0 !important;
+            }}
         }}
 
         /* REGRAS PARA IMPRESSÃO LIMPA */
@@ -304,7 +350,6 @@ if not st.session_state.autenticado:
                                     st.error("Este usuário já existe!")
                                 else:
                                     val_str = "Vitalício" if n_val == "Vitalício" else str(n_data)
-                                    # Salva exatamente o que foi escolhido no multiselect, independente de ser Admin ou não
                                     perm_str = ",".join(n_permissoes)
                                     novo_reg = {
                                         "Usuario": n_login, 
@@ -363,7 +408,6 @@ if not st.session_state.autenticado:
                                     st.error("Selecione pelo menos uma permissão de menu.")
                                 else:
                                     novo_val_str = "Vitalício" if edit_val_tipo == "Vitalício" else str(edit_data)
-                                    # Salva rigorosamente o que foi selecionado no multiselect, desvinculando do perfil de Admin
                                     nova_perm_str = ",".join(edit_permissoes)
                                     
                                     df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Senha"] = edit_senha
@@ -399,7 +443,6 @@ is_user_admin = False
 if not user_logado_row.empty:
     is_user_admin = str(user_logado_row.iloc[0].get("Admin", "Não")) == "Sim"
 
-# Leitura rigorosa do banco de dados (respeita estritamente o que foi gravado nas permissões do usuário)
 if not user_logado_row.empty and pd.notna(user_logado_row.iloc[0].get("Permissoes")) and str(user_logado_row.iloc[0]["Permissoes"]) != "":
     menus_disponiveis = [m.strip() for m in str(user_logado_row.iloc[0]["Permissoes"]).split(",") if m.strip() in TODOS_MENUS]
 else:
@@ -1137,7 +1180,6 @@ if menu is not None:
                 
                 st.markdown("---")
                 
-                # RESTRIÇÃO: APENAS ADMINISTRADORES PODEM GERENCIAR ORÇAMENTOS E ALTERAR STATUS/ITENS/EXCLUSÃO
                 if is_user_admin:
                     col_ges_1, col_ges_2 = st.columns(2)
                     
