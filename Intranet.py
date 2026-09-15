@@ -215,7 +215,7 @@ def carregar_banco_os():
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
 
-# Função auxiliar para renderizar arquivos (Imagens / PDFs)
+# Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64 para evitar bloqueio Chrome HTTP)
 def exibir_documento(caminho_arquivo, titulo):
     if pd.isna(caminho_arquivo) or str(caminho_arquivo).strip() in ["None", ""]:
         st.warning(f"📄 **{titulo}:** Não anexado.")
@@ -232,6 +232,8 @@ def exibir_documento(caminho_arquivo, titulo):
     elif ext == ".pdf":
         with open(str(caminho_arquivo), "rb") as pdf_file:
             pdf_bytes = pdf_file.read()
+            base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+            
             st.download_button(
                 label=f"📥 Baixar/Abrir {titulo} (PDF)",
                 data=pdf_bytes,
@@ -239,8 +241,14 @@ def exibir_documento(caminho_arquivo, titulo):
                 mime="application/pdf",
                 use_container_width=True
             )
-            base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="400" type="application/pdf"></iframe>'
+            
+            # Renderização de PDF puramente em Base64 Data URI sem protocolos HTTP/Inseguros
+            pdf_display = f'''
+                <object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="450px">
+                    <embed src="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="450px"/>
+                    <p style="font-size: 12px; color: #666;">Se o seu navegador não exibir o PDF acima automaticamente, <a href="data:application/pdf;base64,{base64_pdf}" download="{os.path.basename(str(caminho_arquivo))}">clique aqui para baixar diretamente em formato seguro Base64</a>.</p>
+                </object>
+            '''
             st.markdown(pdf_display, unsafe_allow_html=True)
     else:
         with open(str(caminho_arquivo), "rb") as gen_file:
@@ -403,7 +411,6 @@ if not st.session_state.autenticado:
                                 default=perm_atuais_list
                             )
                             
-                            # BOTÃO E FIELD PARA SALVAR ASSINATURA DIGITAL PNG VINCULADA AO USUÁRIO
                             st.markdown("---")
                             st.markdown("✍️ **Assinatura Digital em PNG:**")
                             path_ass_atual = str(row_u_edit.get("Assinatura_PNG", "None"))
@@ -1584,7 +1591,6 @@ if menu is not None:
                         st.markdown("<br>", unsafe_allow_html=True)
                         assinado_por_val = str(row_base_ass.get('Assinado_Por', 'None'))
                         
-                        # STATUS DA ASSINATURA DIGITAL PERMANECE VERDE APENAS APÓS CLICAR EM ASSINAR
                         if assinado_por_val != "None" and assinado_por_val.strip() != "":
                             st.markdown(f"**Status da Assinatura Digital:** <span style='color: #00ff66; font-weight: bold;'>🟢 Assinado por: {assinado_por_val}</span>", unsafe_allow_html=True)
                         else:
@@ -1629,7 +1635,6 @@ if menu is not None:
                     with col_acoes:
                         st.markdown("**Ações de Assinatura e Envio**")
                         
-                        # BOTÃO PARA CLICAR E ASSINAR DIGITALMENTE (FAZENDO O STATUS FICAR VERDE)
                         if st.button("✍️ Assinar Digitalmente (NF e Boleto)", use_container_width=True):
                             if row_base_ass.get("NF_Anexada", "None") != "None" and row_base_ass.get("Boleto_Anexado", "None") != "None":
                                 df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
@@ -1794,27 +1799,27 @@ if menu is not None:
                 st.markdown("<br>", unsafe_allow_html=True)
                 
                 g_c_1, g_c_2 = st.columns(2)
-                
                 with g_c_1:
-                    fig_c_cat = px.pie(df_c_filtrado, names='Categoria', title="Itens por Categoria", hole=0.4, color='Categoria')
-                    fig_c_cat.update_layout(**layout_cfg)
-                    fig_c_cat.update_traces(textposition='inside', textinfo='percent+label')
-                    st.plotly_chart(fig_c_cat, use_container_width=True)
+                    fig_c_status = px.pie(
+                        df_c_filtrado, 
+                        names='Status', 
+                        title="Distribuição de Pedidos por Status", 
+                        hole=0.4,
+                        color='Status',
+                        color_discrete_map={'Compra Realizada':'#00cc96', 'Compra em Aberta':'#ffa15a', 'Compra Recusada':'#ef553b'}
+                    )
+                    fig_c_status.update_layout(**layout_cfg)
+                    st.plotly_chart(fig_c_status, use_container_width=True)
                     
                 with g_c_2:
-                    fig_c_status = px.histogram(df_c_filtrado, x='Status', title="Pedidos por Status", color='Status', text_auto=True)
-                    fig_c_status.update_layout(**layout_cfg, bargap=0.2)
-                    st.plotly_chart(fig_c_status, use_container_width=True)
-
-                g_c_3, g_c_4 = st.columns([1.5, 1])
-                with g_c_3:
-                    top_itens = df_c_filtrado.groupby('Item')['Quantidade'].sum().reset_index().sort_values(by='Quantidade', ascending=False).head(10)
-                    fig_top_itens = px.bar(top_itens, x='Quantidade', y='Item', orientation='h', title="Top 10 Itens Mais Solicitados", text='Quantidade')
-                    fig_top_itens.update_layout(**layout_cfg, yaxis={'categoryorder':'total ascending'})
-                    st.plotly_chart(fig_top_itens, use_container_width=True)
-                    
-                with g_c_4:
-                    c_setor = df_c_filtrado.groupby('Setor')['Quantidade'].sum().reset_index()
-                    fig_c_setor = px.bar(c_setor, x='Setor', y='Quantidade', title="Itens Solicitados por Setor", color='Setor')
-                    fig_c_setor.update_layout(**layout_cfg, showlegend=False)
-                    st.plotly_chart(fig_c_setor, use_container_width=True)
+                    c_cat = df_c_filtrado.groupby('Categoria')['Quantidade'].sum().reset_index()
+                    fig_c_cat = px.bar(
+                        c_cat, 
+                        x='Categoria', 
+                        y='Quantidade', 
+                        title="Quantidade de Itens por Categoria", 
+                        text='Quantidade',
+                        color='Categoria'
+                    )
+                    fig_c_cat.update_layout(**layout_cfg, showlegend=False)
+                    st.plotly_chart(fig_c_cat, use_container_width=True)
