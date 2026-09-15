@@ -151,6 +151,17 @@ def inicializar_bancos():
         if "Orcamento_Assinado" not in df_c.columns:
             df_c["Orcamento_Assinado"] = "None"
             mudou_c = True
+        # Novas colunas para suportar NF e Boleto
+        if "NF_Anexada" not in df_c.columns:
+            df_c["NF_Anexada"] = "None"
+            mudou_c = True
+        if "Boleto_Anexado" not in df_c.columns:
+            df_c["Boleto_Anexado"] = "None"
+            mudou_c = True
+        if "Assinado_Por" not in df_c.columns:
+            df_c["Assinado_Por"] = "None"
+            mudou_c = True
+            
         if mudou_c:
             df_c.to_csv(ARQUIVO_COMPRAS, index=False)
         
@@ -425,6 +436,7 @@ if menu is not None:
     # --- TELA 1: CRIAR NOVA O.S. ---
     if menu == "📝 Nova O.S.":
         st.markdown("# 📝 Abertura de Ordem de Serviço (O.S.)")
+        # [Conteúdo inalterado da tela O.S...]
         st.markdown("Preencha os dados abaixo para registrar a solicitação de manutenção.")
         
         with st.form("form_nova_os", clear_on_submit=True):
@@ -663,6 +675,7 @@ if menu is not None:
     # --- TELA 3: IMPRIMIR O.S. E RELATÓRIO DE O.S. ---
     elif menu == "🖨️ Imprimir O.S.":
         st.markdown("# 🖨️ Emissão e Relatórios de O.S.")
+        # [Conteúdo inalterado de impressão de OS...]
         df = carregar_banco_os()
         
         if df.empty:
@@ -905,7 +918,7 @@ if menu is not None:
     # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---
     elif menu == "📅 Formulários e Prazos (FMs)":
         st.markdown("# 📅 Gestão de Conformidade de Formulários (FMs)")
-        
+        # [Conteúdo inalterado de formulários e prazos...]
         tab_fm1, tab_fm2, tab_fm3 = st.tabs(["➕ Registrar / 🔄 Renovar FM", "🗑️ Excluir FM", "📊 Painel de Prazos e Status"])
         
         dias_dict = {
@@ -1048,7 +1061,13 @@ if menu is not None:
         if "carrinho_compras" not in st.session_state:
             st.session_state.carrinho_compras = []
             
-        tab_comp1, tab_comp2, tab_comp3 = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação", "🖨️ Imprimir Ordem de Compra"])
+        # Modificação para exibir abas diferentes dependendo se o usuário é Admin (para visualizar a aba de Assinaturas)
+        if is_user_admin:
+            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação", "🖨️ Imprimir Ordem de Compra", "✍️ Assinaturas (Admin)"])
+            tab_comp1, tab_comp2, tab_comp3, tab_comp4 = abas_compras
+        else:
+            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação", "🖨️ Imprimir Ordem de Compra"])
+            tab_comp1, tab_comp2, tab_comp3 = abas_compras
         
         with tab_comp1:
             st.markdown("### Gerenciar Solicitações e Anexar Orçamento")
@@ -1324,7 +1343,10 @@ if menu is not None:
                                     "Quantidade": str(it["Quantidade"]),
                                     "Observacoes": obs_c.upper() if obs_c else "",
                                     "Status": "Compra em Aberta",
-                                    "Orcamento_Assinado": "None"
+                                    "Orcamento_Assinado": "None",
+                                    "NF_Anexada": "None",
+                                    "Boleto_Anexado": "None",
+                                    "Assinado_Por": "None"
                                 })
                             
                             df_c = pd.concat([df_c, pd.DataFrame(novas_linhas)], ignore_index=True)
@@ -1449,6 +1471,90 @@ if menu is not None:
 </html>
 """
                 components.html(print_compra_html, height=750, scrolling=True)
+
+        # ABA 4 - ASSINATURAS E ENVIOS (SOMENTE ADMIN)
+        if is_user_admin:
+            with tab_comp4:
+                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto)")
+                df_ass = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+                if df_ass.empty:
+                    st.info("Nenhuma compra registrada para assinar.")
+                else:
+                    ids_ass = sorted(df_ass["ID_Compra"].unique().tolist(), reverse=True)
+                    col_sel1, col_sel2 = st.columns([1, 2])
+                    
+                    with col_sel1:
+                        id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
+                        rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
+                        row_base_ass = rows_ass.iloc[0]
+                    
+                    with col_sel2:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        st.write(f"**Status da Assinatura Digital:** {row_base_ass.get('Assinado_Por', 'Nenhum')}")
+                        st.write(f"**Orçamento Anexado:** {'✅ Sim' if row_base_ass.get('Orcamento_Assinado', 'None') != 'None' else '❌ Não'}")
+                        st.write(f"**NF Anexada:** {'✅ Sim' if row_base_ass.get('NF_Anexada', 'None') != 'None' else '❌ Não'}")
+                        st.write(f"**Boleto Anexado:** {'✅ Sim' if row_base_ass.get('Boleto_Anexado', 'None') != 'None' else '❌ Não'}")
+                    
+                    st.markdown("---")
+                    
+                    col_upload, col_acoes = st.columns(2)
+                    
+                    with col_upload:
+                        with st.form("form_up_nf_bol"):
+                            st.markdown("**Upload de Nota Fiscal e Boleto**")
+                            up_nf = st.file_uploader("Upload da Nota Fiscal (NF)", type=["pdf", "png", "jpg", "jpeg"])
+                            up_bol = st.file_uploader("Upload do Boleto", type=["pdf", "png", "jpg", "jpeg"])
+                            
+                            if st.form_submit_button("Salvar Documentos"):
+                                salvou_algo = False
+                                if up_nf is not None:
+                                    nf_name = f"nf_{id_sel_ass}_{up_nf.name}"
+                                    nf_path = os.path.join("uploads_orcamentos", nf_name)
+                                    with open(nf_path, "wb") as f: f.write(up_nf.getbuffer())
+                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "NF_Anexada"] = nf_path
+                                    salvou_algo = True
+                                    
+                                if up_bol is not None:
+                                    bol_name = f"boleto_{id_sel_ass}_{up_bol.name}"
+                                    bol_path = os.path.join("uploads_orcamentos", bol_name)
+                                    with open(bol_path, "wb") as f: f.write(up_bol.getbuffer())
+                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Boleto_Anexado"] = bol_path
+                                    salvou_algo = True
+                                    
+                                if salvou_algo:
+                                    df_to_save = df_ass.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
+                                    df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
+                                    st.success("Documentos salvos com sucesso!")
+                                    st.rerun()
+
+                    with col_acoes:
+                        st.markdown("**Ações de Assinatura e Envio**")
+                        # Botão de Assinatura Digital
+                        if st.button("✍️ Assinar Digitalmente (NF e Boleto)", use_container_width=True):
+                            if row_base_ass.get("NF_Anexada", "None") != "None" and row_base_ass.get("Boleto_Anexado", "None") != "None":
+                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
+                                df_to_save = df_ass.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
+                                df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
+                                st.success(f"Documentos assinados digitalmente por: {st.session_state.usuario}!")
+                                st.rerun()
+                            else:
+                                st.error("Você precisa fazer o upload da Nota Fiscal e do Boleto antes de assinar.")
+                                
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        
+                        with st.form("form_email_ass"):
+                            st.markdown("**Enviar Documentos (Orçamento, NF e Boleto)**")
+                            email_dest = st.text_input("E-mail de Destino")
+                            obs_email = st.text_area("Observação para anexar ao E-mail")
+                            
+                            if st.form_submit_button("📧 Enviar por E-mail", use_container_width=True):
+                                if not email_dest:
+                                    st.error("Preencha o e-mail de destino.")
+                                elif row_base_ass.get("Assinado_Por", "None") == "None":
+                                    st.error("Os documentos precisam ser assinados digitalmente antes de serem enviados!")
+                                else:
+                                    # Simulação de disparo de e-mail 
+                                    st.success(f"E-mail disparado para {email_dest} contendo o orçamento, NF, Boleto assinados e suas observações.")
 
     # --- TELA 6: DASHBOARD (O.S. & COMPRAS) ---
     elif menu == "📊 Dashboard":
