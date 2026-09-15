@@ -1709,189 +1709,140 @@ if menu is not None:
                     
                     with col_sel1:
                         id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
-                        rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
-                        row_base_ass = rows_ass.iloc[0]
-                    
-                    with col_sel2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        assinado_por_val = str(row_base_ass.get('Assinado_Por', 'None')).strip()
                         
-                        if assinado_por_val != "None" and assinado_por_val != "":
-                            st.markdown(
-                                "**Status da Assinatura Digital:** <span style='background-color: #28a745; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🟢 Assinado</span>", 
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            st.markdown(
-                                "**Status da Assinatura Digital:** <span style='background-color: #dc3545; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🔴 Pendente de Assinatura</span>", 
-                                unsafe_allow_html=True
-                            )
-
-                    st.markdown("---")
-                    
-                    col_upload, col_acoes = st.columns(2)
-                    
-                    with col_upload:
-                        with st.form("form_up_nf_bol"):
-                            st.markdown("**Upload de Nota Fiscal e Boleto**")
-                            up_nf = st.file_uploader("Upload da Nota Fiscal (NF)", type=["pdf", "png", "jpg", "jpeg"])
-                            up_bol = st.file_uploader("Upload do Boleto", type=["pdf", "png", "jpg", "jpeg"])
-                            
-                            if st.form_submit_button("Salvar Documentos"):
-                                salvou_algo = False
-                                if up_nf is not None:
-                                    nf_name = f"nf_{id_sel_ass}_{up_nf.name}"
-                                    nf_path = os.path.join("uploads_orcamentos", nf_name)
-                                    with open(nf_path, "wb") as f: 
-                                        f.write(up_nf.getbuffer())
-                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "NF_Anexada"] = nf_path
-                                    salvou_algo = True
-                                    
-                                if up_bol is not None:
-                                    bol_name = f"boleto_{id_sel_ass}_{up_bol.name}"
-                                    bol_path = os.path.join("uploads_orcamentos", bol_name)
-                                    with open(bol_path, "wb") as f: 
-                                        f.write(up_bol.getbuffer())
-                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Boleto_Anexado"] = bol_path
-                                    salvou_algo = True
-                                    
-                                if salvou_algo:
-                                    df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                    st.success("Documentos salvos com sucesso!")
-                                    st.rerun()
-                                else:
-                                    st.warning("Selecione ao menos um arquivo para salvar.")
-
-                    with col_acoes:
-                        st.markdown("**Ações de Assinatura e Envio**")
+                        row_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)].iloc[0]
+                        path_orc = str(row_ass.get("Orcamento_Assinado", "None"))
+                        path_nf = str(row_ass.get("NF_Anexada", "None"))
+                        path_bol = str(row_ass.get("Boleto_Anexado", "None"))
+                        assinado_por = str(row_ass.get("Assinado_Por", "None"))
                         
-                        # Buscar a assinatura em PNG vinculada ao usuário logado
-                        df_u_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                        row_u_logged = df_u_check[df_u_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                        ass_png_path = "None"
-                        if not row_u_logged.empty:
-                            ass_png_path = str(row_u_logged.iloc[0].get("Assinatura_PNG", "None"))
-                            
-                        tem_assinatura_png = (ass_png_path != "None" and os.path.exists(ass_png_path))
+                        status_ass_str = "🔴 Pendente" if assinado_por == "None" else "🟢 Assinado"
+                        st.markdown(f"**Status da Assinatura Digital:** {status_ass_str}")
                         
-                        if not tem_assinatura_png:
-                            st.warning("⚠️ Seu usuário não possui uma assinatura em PNG cadastrada na tela de Login.")
+                        st.markdown("---")
+                        st.markdown("**1. Upload de Nota Fiscal (NF):**")
+                        up_nf = st.file_uploader("Anexar Nota Fiscal (PDF/Img)", type=["pdf", "png", "jpg", "jpeg"], key="up_nf_file")
                         
-                        if st.button("✍️ Assinar Documentos (Orçamento, NF e Boleto)", disabled=not tem_assinatura_png, use_container_width=True):
-                            documentos_para_assinar = [
-                                str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                str(row_base_ass.get("NF_Anexada", "None")),
-                                str(row_base_ass.get("Boleto_Anexado", "None"))
-                            ]
-                            
-                            assinaram_algo = False
-                            for doc in documentos_para_assinar:
-                                if doc != "None" and os.path.exists(doc):
-                                    res = carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario)
-                                    if res:
-                                        assinaram_algo = True
-                                        
-                            if assinaram_algo:
-                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
+                        st.markdown("**2. Upload de Boleto:**")
+                        up_bol = st.file_uploader("Anexar Boleto (PDF/Img)", type=["pdf", "png", "jpg", "jpeg"], key="up_bol_file")
+                        
+                        if st.button("💾 Salvar Anexos (NF e Boleto)", use_container_width=True):
+                            mudou_anexo = False
+                            if up_nf is not None:
+                                file_nf_name = f"nf_{id_sel_ass}_{up_nf.name}"
+                                path_nf_save = os.path.join("uploads_orcamentos", file_nf_name)
+                                with open(path_nf_save, "wb") as f:
+                                    f.write(up_nf.getbuffer())
+                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "NF_Anexada"] = path_nf_save
+                                mudou_anexo = True
+                                
+                            if up_bol is not None:
+                                file_bol_name = f"boleto_{id_sel_ass}_{up_bol.name}"
+                                path_bol_save = os.path.join("uploads_orcamentos", file_bol_name)
+                                with open(path_bol_save, "wb") as f:
+                                    f.write(up_bol.getbuffer())
+                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Boleto_Anexado"] = path_bol_save
+                                mudou_anexo = True
+                                
+                            if mudou_anexo:
                                 df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success(f"Documentos do Pedido #{id_sel_ass} assinados digitalmente por {st.session_state.usuario}!")
+                                st.success("Anexos de NF e Boleto salvos com sucesso!")
                                 st.rerun()
-                            else:
-                                st.error("Nenhum documento válido encontrado ou anexado para assinar.")
                                 
                         st.markdown("---")
                         
-                        with st.form("form_enviar_email_docs"):
-                            st.markdown("**📧 Enviar Documentos por E-mail:**")
-                            dest_email = st.text_input("E-mail do Destinatário", value="financeiro@stang.com.br")
-                            corpo_email_default = f"Olá,\n\nSegue em anexo a documentação referente ao Pedido de Compra #{id_sel_ass}.\n\nAtenciosamente,\nIntranet Stang"
-                            corpo_msg = st.text_area("Mensagem do E-mail", value=corpo_email_default, height=100)
+                        # --- VERIFICAR SE O USUÁRIO LOGADO TEM ASSINATURA PNG CADASTRADA ---
+                        df_u_ass = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                        row_u_logado = df_u_ass[df_u_ass["Usuario"].str.lower() == st.session_state.usuario.lower()]
+                        path_png_user = "None"
+                        if not row_u_logado.empty:
+                            path_png_user = str(row_u_logado.iloc[0].get("Assinatura_PNG", "None"))
                             
-                            btn_enviar_e = st.form_submit_button("🚀 Enviar E-mail com Anexos", use_container_width=True)
+                        if path_png_user == "None" or not os.path.exists(path_png_user):
+                            st.warning(f"⚠️ O usuário **{st.session_state.usuario}** não possui Assinatura Digital PNG cadastrada no perfil. Cadastre-a na tela de Login no painel de Usuários.")
+                        else:
+                            st.image(path_png_user, caption=f"Assinatura PNG Pronta para Uso ({st.session_state.usuario})", width=180)
                             
-                            if btn_enviar_e:
-                                if not dest_email:
-                                    st.error("Informe o e-mail do destinatário.")
+                            if st.button("✍️ Carimbar / Assinar Orçamento Digitalmente", type="primary", use_container_width=True):
+                                if path_orc == "None" or not os.path.exists(path_orc):
+                                    st.error("Não há documento de orçamento anexado a este pedido para assinar!")
                                 else:
-                                    df_cfg_latest = pd.read_csv(ARQUIVO_CONFIG_EMAIL, dtype=str)
-                                    cfg_e_dict = df_cfg_latest.iloc[0].to_dict() if not df_cfg_latest.empty else {}
-                                    
-                                    anexos_envio = [
-                                        str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                        str(row_base_ass.get("NF_Anexada", "None")),
-                                        str(row_base_ass.get("Boleto_Anexado", "None"))
-                                    ]
-                                    
-                                    sucesso_e, msg_e = enviar_email_real(
-                                        destinatario=dest_email,
-                                        assunto=f"Documentação do Pedido de Compra #{id_sel_ass} - Intranet Stang",
-                                        corpo=corpo_msg,
-                                        anexos=anexos_envio,
-                                        config=cfg_e_dict
-                                    )
-                                    
-                                    if sucesso_e:
-                                        st.success(f"E-mail enviado com sucesso para {dest_email}!")
-                                    else:
-                                        st.error(f"Erro no envio: {msg_e}")
+                                    sucesso = carimbar_assinatura_no_documento(path_orc, path_png_user, st.session_state.usuario)
+                                    if sucesso:
+                                        df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
+                                        df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
+                                        st.success("Documento assinado digitalmente com sucesso!")
+                                        st.rerun()
 
-                    st.markdown("---")
-                    st.markdown("#### 📄 Visualização de Documentos Vinculados ao Pedido:")
-                    
-                    c_doc1, c_doc2, c_doc3 = st.columns(3)
-                    with c_doc1:
-                        exibir_documento(row_base_ass.get("Orcamento_Assinado", "None"), "Orçamento")
-                    with c_doc2:
-                        exibir_documento(row_base_ass.get("NF_Anexada", "None"), "Nota Fiscal")
-                    with c_doc3:
-                        exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
+                        st.markdown("---")
+                        st.markdown("📧 **Enviar Pedido Completo por E-mail:**")
+                        email_dest_input = st.text_input("E-mail do Destinatário (Ex: financeiro@empresa.com)", value="")
+                        
+                        if st.button("🚀 Enviar Orçamento + NF + Boleto por E-mail", use_container_width=True):
+                            if not email_dest_input:
+                                st.error("Informe o e-mail do destinatário!")
+                            else:
+                                df_cfg_e = pd.read_csv(ARQUIVO_CONFIG_EMAIL, dtype=str)
+                                cfg_actual = df_cfg_e.iloc[0].to_dict() if not df_cfg_e.empty else {}
+                                
+                                anexos_envio = [path_orc, path_nf, path_bol]
+                                corpo_email = f"""
+Olá,
 
-    # --- TELA 6: DASHBOARD ANALÍTICO ---
+Segue em anexo a documentação completa referente ao Pedido de Compra #{id_sel_ass} da Intranet Stang.
+
+Solicitante: {row_ass.get('Solicitante', '')}
+Setor: {row_ass.get('Setor', '')}
+Assinado Digitalmente por: {st.session_state.usuario}
+
+Atenciosamente,
+Intranet Stang Compras
+                                """
+                                sucesso_env, msg_env = enviar_email_real(
+                                    destinatario=email_dest_input,
+                                    assunto=f"Pedido de Compra #{id_sel_ass} - Documentos Anexados Stang",
+                                    corpo=corpo_email,
+                                    anexos=anexos_envio,
+                                    config=cfg_actual
+                                )
+                                if sucesso_env:
+                                    st.success(msg_env)
+                                else:
+                                    st.error(msg_env)
+                                    
+                    with col_sel2:
+                        st.markdown("#### 🔍 Visualização de Documentos do Pedido")
+                        exibir_documento(path_orc, "Orçamento (Documento Principal)")
+                        exibir_documento(path_nf, "Nota Fiscal (NF)")
+                        exibir_documento(path_bol, "Boleto")
+
+    # --- TELA 6: DASHBOARD E INDICADORES ---
     elif menu == "📊 Dashboard":
-        st.markdown("# 📊 Painel Geral de Indicadores e Métricas Stang")
+        st.markdown("# 📊 Dashboard e Indicadores Operacionais")
         
-        tab_dash1, tab_dash2 = st.tabs(["📊 Indicadores O.S.", "🛒 Indicadores Compras"])
+        df_os = carregar_banco_os()
+        df_fms = pd.read_csv(ARQUIVO_FMS, dtype=str) if os.path.exists(ARQUIVO_FMS) else pd.DataFrame()
+        df_compras = pd.read_csv(ARQUIVO_COMPRAS, dtype=str) if os.path.exists(ARQUIVO_COMPRAS) else pd.DataFrame()
         
-        with tab_dash1:
-            df_os = carregar_banco_os()
-            if df_os.empty:
-                st.info("Nenhuma O.S. cadastrada para gerar o dashboard.")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total O.S. Registradas", len(df_os))
+        c2.metric("O.S. Em Aberto", len(df_os[df_os["Status"] == "Em Aberto"]))
+        c3.metric("FMs Cadastrados", len(df_fms))
+        c4.metric("Solicitações de Compras", len(df_compras["ID_Compra"].unique()) if not df_compras.empty else 0)
+        
+        st.markdown("---")
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            if not df_os.empty:
+                fig_os = px.pie(df_os, names='Status', title='Distribuição de O.S. por Status', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+                st.plotly_chart(fig_os, use_container_width=True)
             else:
-                total_os = len(df_os)
-                abertas = len(df_os[df_os["Status"] == "Em Aberto"])
-                andamento = len(df_os[df_os["Status"] == "Em Andamento"])
-                finalizadas = len(df_os[df_os["Status"] == "Finalizada"])
+                st.info("Sem dados de O.S. para exibir gráfico.")
                 
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total de O.S.", total_os)
-                m2.metric("Em Aberto 🟠", abertas)
-                m3.metric("Em Andamento 🔵", andamento)
-                m4.metric("Finalizadas 🟢", finalizadas)
-                
-                st.markdown("---")
-                
-                col_g1, col_g2 = st.columns(2)
-                with col_g1:
-                    fig_status = px.pie(df_os, names="Status", title="Distribuição de O.S. por Status", hole=0.4)
-                    st.plotly_chart(fig_status, use_container_width=True)
-                with col_g2:
-                    fig_setor = px.bar(df_os, x="Setor", title="Volume de O.S. por Setor Solicitante", color="Setor")
-                    st.plotly_chart(fig_setor, use_container_width=True)
-
-        with tab_dash2:
-            df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-            if df_c.empty:
-                st.info("Nenhuma solicitação de compra cadastrada para gerar o dashboard.")
+        with col_g2:
+            if not df_os.empty:
+                fig_setor = px.bar(df_os, x='Setor', title='Ordens de Serviço por Setor', color='Setor', color_discrete_sequence=px.colors.qualitative.Set2)
+                st.plotly_chart(fig_setor, use_container_width=True)
             else:
-                total_c = len(df_c["ID_Compra"].unique())
-                
-                st.metric("Total de Solicitações de Compras", total_c)
-                st.markdown("---")
-                
-                col_cg1, col_cg2 = st.columns(2)
-                with col_cg1:
-                    fig_cat = px.pie(df_c, names="Categoria", title="Distribuição de Itens por Categoria")
-                    st.plotly_chart(fig_cat, use_container_width=True)
-                with col_cg2:
-                    fig_status_c = px.histogram(df_c, x="Status", title="Status Geral das Solicitações", color="Status")
-                    st.plotly_chart(fig_status_c, use_container_width=True)
+                st.info("Sem dados de Setor para exibir gráfico.")
