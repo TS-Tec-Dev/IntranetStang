@@ -1714,17 +1714,19 @@ if menu is not None:
                     
                     with col_sel2:
                         st.markdown("<br>", unsafe_allow_html=True)
-                        assinado_por_val = str(row_base_ass.get('Assinado_Por', 'None'))
+                        assinado_por_val = str(row_base_ass.get('Assinado_Por', 'None')).strip()
                         
-                        if assinado_por_val != "None" and assinado_por_val.strip() != "":
-                            st.markdown(f"**Status da Assinatura Digital:** <span style='color: #00ff66; font-weight: bold;'>🟢 Assinado por: {assinado_por_val}</span>", unsafe_allow_html=True)
+                        if assinado_por_val != "None" and assinado_por_val != "":
+                            st.markdown(
+                                f"**Status da Assinatura Digital:** <span style='background-color: #28a745; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🟢 Assinado por: {assinado_por_val}</span>", 
+                                unsafe_allow_html=True
+                            )
                         else:
-                            st.markdown("**Status da Assinatura Digital:** <span style='color: #ff4444; font-weight: bold;'>🔴 Pendente de Assinatura</span>", unsafe_allow_html=True)
+                            st.markdown(
+                                "**Status da Assinatura Digital:** <span style='background-color: #dc3545; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🔴 Pendente de Assinatura</span>", 
+                                unsafe_allow_html=True
+                            )
 
-                        st.write(f"**Orçamento Anexado:** {'✅ Sim' if str(row_base_ass.get('Orcamento_Assinado', 'None')) != 'None' else '❌ Não'}")
-                        st.write(f"**NF Anexada:** {'✅ Sim' if str(row_base_ass.get('NF_Anexada', 'None')) != 'None' else '❌ Não'}")
-                        st.write(f"**Boleto Anexado:** {'✅ Sim' if str(row_base_ass.get('Boleto_Anexado', 'None')) != 'None' else '❌ Não'}")
-                    
                     st.markdown("---")
                     
                     col_upload, col_acoes = st.columns(2)
@@ -1799,8 +1801,15 @@ if menu is not None:
                         st.markdown("---")
                         
                         destinatario_input = st.text_input("E-mail do Destinatário", value="financeiro@stang.com.br", key="email_dest_input")
+                        obs_email_input = st.text_area("Observação / Comentário Adicional no E-mail", placeholder="Digite um comentário adicional que aparecerá no corpo do e-mail...", key="obs_email_input")
+                        
                         assunto_email = f"Solicitação de Compra #{id_sel_ass} - Documentos e Orçamento"
-                        corpo_email = f"Olá,\n\nSegue em anexo a documentação completa referente ao Pedido de Compra #{id_sel_ass}.\n\nSolicitante: {row_base_ass['Solicitante']}\nSetor: {row_base_ass['Setor']}\n\nAtenciosamente,\nIntranet Stang"
+                        corpo_email = f"Olá,\n\nSegue em anexo a documentação completa referente ao Pedido de Compra #{id_sel_ass}.\n\nSolicitante: {row_base_ass['Solicitante']}\nSetor: {row_base_ass['Setor']}\n"
+                        
+                        if obs_email_input.strip():
+                            corpo_email += f"\nObservações:\n{obs_email_input.strip()}\n"
+                            
+                        corpo_email += "\nAtenciosamente,\nIntranet Stang"
                         
                         if st.button("📧 Enviar E-mail com Orçamento, NF e Boleto", use_container_width=True):
                             anexos_envio = []
