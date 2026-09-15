@@ -4,6 +4,7 @@ import pandas as pd
 import os
 from datetime import datetime, timedelta
 import plotly.express as px
+import plotly.graph_objects as go
 from PIL import Image
 import base64
 import smtplib
@@ -86,6 +87,47 @@ if os.path.exists("capa.png"):
         div[data-testid="stMetricValue"] {{
             color: #00ffcc !important;
         }}
+        
+        /* CARDS COMPACTOS DE STATUS (ESTILO POWER BI / MODERN BADGES) */
+        .status-card-container {{
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }}
+        .status-card {{
+            flex: 1;
+            min-width: 140px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 14px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }}
+        .status-card:hover {{
+            border-color: rgba(0, 255, 204, 0.4);
+            transform: translateY(-2px);
+        }}
+        .status-card-title {{
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }}
+        .status-card-value {{
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .badge-success {{ color: #00ffaa; }}
+        .badge-danger {{ color: #ff4b4b; }}
+        .badge-warning {{ color: #ffb703; }}
         
         /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) COM SUPORTE A TEMA */
         [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
@@ -1238,7 +1280,7 @@ if menu is not None:
                             if tem_anexo:
                                 st.caption(f"Atual: {os.path.basename(str(path_atual))}")
                             else:
-                                st.caption("Nenhum anexo atual.")
+                                st.caption("Nenum anexo atual.")
                             
                             col_b1, col_b2 = st.columns(2)
                             btn_anexar = col_b1.form_submit_button("💾 Salvar", use_container_width=True)
@@ -1596,7 +1638,7 @@ if menu is not None:
                             else:
                                 st.error("Nenhum documento válido encontrado/anexado para assinar.")
 
-                    # --- QUADRO DE STATUS INTUITIVO DO PEDIDO ---
+                    # --- QUADRO DE STATUS INTUITIVO, COMPACTO E VISUAL DO PEDIDO ---
                     p_orc = row_base_ass.get("Orcamento_Assinado", "None")
                     p_nf = row_base_ass.get("NF_Anexada", "None")
                     p_bol = row_base_ass.get("Boleto_Anexado", "None")
@@ -1607,21 +1649,31 @@ if menu is not None:
                     has_bol = pd.notna(p_bol) and str(p_bol).strip() != "None" and os.path.exists(str(p_bol))
                     has_signature = pd.notna(p_ass) and str(p_ass).strip() != "None" and str(p_ass).strip() != ""
                     
-                    st.markdown("#### 📊 Status da Documentação")
-                    col_st_doc1, col_st_doc2 = st.columns(2)
-                    
-                    with col_st_doc1:
-                        txt_orc = "✅ Sim" if has_orc else "❌ Não"
-                        txt_nf = "✅ Sim" if has_nf else "❌ Não"
-                        txt_bol = "✅ Sim" if has_bol else "❌ Não"
-                        status_anexos = f"Orçamento: {txt_orc} | NF: {txt_nf} | Boleto: {txt_bol}"
-                        st.metric(label="Status de Anexos do Pedido", value=status_anexos)
-                        
-                    with col_st_doc2:
-                        txt_ass = f"✅ Assinado por {p_ass}" if has_signature else "❌ Não Assinado"
-                        st.metric(label="Status de Assinatura Digital", value=txt_ass)
+                    val_orc = '<span class="badge-success">✅ Anexado</span>' if has_orc else '<span class="badge-danger">❌ Pendente</span>'
+                    val_nf = '<span class="badge-success">✅ Anexada</span>' if has_nf else '<span class="badge-danger">❌ Pendente</span>'
+                    val_bol = '<span class="badge-success">✅ Anexado</span>' if has_bol else '<span class="badge-danger">❌ Pendente</span>'
+                    val_ass = f'<span class="badge-success">✅ Por {p_ass}</span>' if has_signature else '<span class="badge-warning">⚠️ Não Assinado</span>'
 
-                    st.markdown("---")
+                    st.markdown(f"""
+                    <div class="status-card-container">
+                        <div class="status-card">
+                            <div class="status-card-title">Orçamento</div>
+                            <div class="status-card-value">{val_orc}</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-card-title">Nota Fiscal</div>
+                            <div class="status-card-value">{val_nf}</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-card-title">Boleto</div>
+                            <div class="status-card-value">{val_bol}</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-card-title">Assinatura Digital</div>
+                            <div class="status-card-value">{val_ass}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                     # Descrição/Resumo do pedido para saber a que se refere o número do pedido
                     itens_do_pedido_str = ", ".join([f"{r['Item']} (Qtd: {r['Quantidade']})" for _, r in rows_ass.iterrows()])
@@ -1731,21 +1783,88 @@ if menu is not None:
                     with c_doc3:
                         exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
 
-    # --- TELA 6: DASHBOARD ANALÍTICO ---
+    # --- TELA 6: DASHBOARD ANALÍTICO INTERATIVO (POWER BI STYLE) ---
     elif menu == "📊 Dashboard":
         st.markdown("# 📊 Painel Geral de Indicadores e Métricas Stang")
         
+        # Carregamento de dados prévio para popular filtros
+        df_os_raw = carregar_banco_os()
+        df_c_raw = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+
+        # Tratar datas O.S.
+        if not df_os_raw.empty:
+            df_os_raw['Data_Parsed'] = pd.to_datetime(df_os_raw['Data_Criacao'].astype(str).str.split(' ').str[0], format='%d/%m/%Y', errors='coerce')
+        else:
+            df_os_raw['Data_Parsed'] = pd.NaT
+
+        # Tratar datas Compras
+        if not df_c_raw.empty:
+            df_c_raw['Data_Parsed'] = pd.to_datetime(df_c_raw['Data_Solicitacao'].astype(str).str.split(' ').str[0], format='%Y-%m-%d', errors='coerce')
+        else:
+            df_c_raw['Data_Parsed'] = pd.NaT
+
+        # --- FILTROS GLOBAIS ESTILO POWER BI ---
+        with st.expander("🔍 **Filtros Interativos do Dashboard**", expanded=True):
+            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+            
+            # Opções de Setores unificados
+            setores_os = df_os_raw['Setor'].dropna().unique().tolist() if not df_os_raw.empty else []
+            setores_c = df_c_raw['Setor'].dropna().unique().tolist() if not df_c_raw.empty else []
+            lista_setores = ["Todos"] + sorted(list(set(setores_os + setores_c)))
+
+            # Opções de Solicitantes unificados
+            solic_os = df_os_raw['Solicitante'].dropna().unique().tolist() if not df_os_raw.empty else []
+            solic_c = df_c_raw['Solicitante'].dropna().unique().tolist() if not df_c_raw.empty else []
+            lista_solicitantes = ["Todos"] + sorted(list(set(solic_os + solic_c)))
+
+            with f_col1:
+                filtro_dash_setor = st.selectbox("🏢 Setor", lista_setores, key="dash_f_setor")
+            with f_col2:
+                filtro_dash_solic = st.selectbox("👤 Solicitante", lista_solicitantes, key="dash_f_solic")
+            with f_col3:
+                data_inicio = st.date_input("📅 Data Inicial", value=None, key="dash_f_dini")
+            with f_col4:
+                data_fim = st.date_input("📅 Data Final", value=None, key="dash_f_dfim")
+
+        # Aplicação dos Filtros nas Bases
+        df_os_filtered = df_os_raw.copy()
+        df_c_filtered = df_c_raw.copy()
+
+        if filtro_dash_setor != "Todos":
+            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Setor'] == filtro_dash_setor]
+            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Setor'] == filtro_dash_setor]
+
+        if filtro_dash_solic != "Todos":
+            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Solicitante'] == filtro_dash_solic]
+            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Solicitante'] == filtro_dash_solic]
+
+        if data_inicio:
+            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Data_Parsed'].dt.date >= data_inicio]
+            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Data_Parsed'].dt.date >= data_inicio]
+
+        if data_fim:
+            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Data_Parsed'].dt.date <= data_fim]
+            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Data_Parsed'].dt.date <= data_fim]
+
+        # Template de layout transparente para o Plotly estilo PowerBI Dark
+        layout_transparente = dict(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#ffffff", size=12),
+            margin=dict(l=20, r=20, t=40, b=20),
+            legend=dict(font=dict(color="#ffffff"))
+        )
+
         tab_dash1, tab_dash2 = st.tabs(["📊 Indicadores O.S.", "🛒 Indicadores Compras"])
         
         with tab_dash1:
-            df_os = carregar_banco_os()
-            if df_os.empty:
-                st.info("Nenhuma O.S. cadastrada para gerar o dashboard.")
+            if df_os_filtered.empty:
+                st.info("Nenhuma Ordem de Serviço encontrada para os filtros selecionados.")
             else:
-                total_os = len(df_os)
-                abertas = len(df_os[df_os["Status"] == "Em Aberto"])
-                andamento = len(df_os[df_os["Status"] == "Em Andamento"])
-                finalizadas = len(df_os[df_os["Status"] == "Finalizada"])
+                total_os = len(df_os_filtered)
+                abertas = len(df_os_filtered[df_os_filtered["Status"] == "Em Aberto"])
+                andamento = len(df_os_filtered[df_os_filtered["Status"] == "Em Andamento"])
+                finalizadas = len(df_os_filtered[df_os_filtered["Status"] == "Finalizada"])
                 
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Total de O.S.", total_os)
@@ -1756,27 +1875,141 @@ if menu is not None:
                 st.markdown("---")
                 
                 col_g1, col_g2 = st.columns(2)
+                
+                # Gráfico 1: Rosca (Status) Estilo Power BI
                 with col_g1:
-                    fig_status = px.pie(df_os, names="Status", title="Distribuição de O.S. por Status", hole=0.4)
+                    fig_status = px.pie(
+                        df_os_filtered, 
+                        names="Status", 
+                        title="<b>Distribuição por Status</b>",
+                        hole=0.55,
+                        color_discrete_sequence=px.colors.qualitative.Bold
+                    )
+                    fig_status.update_traces(textposition='inside', textinfo='percent+label')
+                    fig_status.update_layout(**layout_transparente)
                     st.plotly_chart(fig_status, use_container_width=True)
+                
+                # Gráfico 2: Barras Horizontais (Prioridade por Status)
                 with col_g2:
-                    fig_setor = px.bar(df_os, x="Setor", title="Volume de O.S. por Setor Solicitante", color="Setor")
+                    fig_prio = px.histogram(
+                        df_os_filtered, 
+                        y="Prioridade", 
+                        color="Status", 
+                        title="<b>Volume por Prioridade e Status</b>",
+                        orientation="h",
+                        color_discrete_sequence=px.colors.qualitative.Pastel
+                    )
+                    fig_prio.update_layout(**layout_transparente)
+                    fig_prio.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
+                    st.plotly_chart(fig_prio, use_container_width=True)
+
+                col_g3, col_g4 = st.columns(2)
+
+                # Gráfico 3: Volume por Setor
+                with col_g3:
+                    df_setor_cnt = df_os_filtered["Setor"].value_counts().reset_index()
+                    df_setor_cnt.columns = ["Setor", "Qtd"]
+                    fig_setor = px.bar(
+                        df_setor_cnt, 
+                        x="Setor", 
+                        y="Qtd", 
+                        title="<b>Total de O.S. por Setor</b>",
+                        text_auto=True,
+                        color="Qtd",
+                        color_continuous_scale="Viridis"
+                    )
+                    fig_setor.update_layout(**layout_transparente)
+                    fig_setor.update_coloraxes(showscale=False)
+                    fig_setor.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
                     st.plotly_chart(fig_setor, use_container_width=True)
 
+                # Gráfico 4: Evolução Temporal de Chamados
+                with col_g4:
+                    df_tempo = df_os_filtered.dropna(subset=['Data_Parsed']).groupby(df_os_filtered['Data_Parsed'].dt.to_period('M')).size().reset_index(name='Qtd')
+                    if not df_tempo.empty:
+                        df_tempo['Data_Parsed'] = df_tempo['Data_Parsed'].astype(str)
+                        fig_linha = px.area(
+                            df_tempo, 
+                            x='Data_Parsed', 
+                            y='Qtd', 
+                            title="<b>Evolução Mensal de O.S.</b>",
+                            markers=True
+                        )
+                        fig_linha.update_traces(line_color="#00ffcc", fillcolor="rgba(0, 255, 204, 0.1)")
+                        fig_linha.update_layout(**layout_transparente)
+                        fig_linha.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
+                        fig_linha.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
+                        st.plotly_chart(fig_linha, use_container_width=True)
+                    else:
+                        st.info("Sem dados temporais suficientes para exibir linha de tendência.")
+
         with tab_dash2:
-            df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-            if df_c.empty:
-                st.info("Nenhuma solicitação de compra cadastrada para gerar o dashboard.")
+            if df_c_filtered.empty:
+                st.info("Nenhuma solicitação de compra encontrada para os filtros selecionados.")
             else:
-                total_c = len(df_c["ID_Compra"].unique())
+                total_pedidos = len(df_c_filtered["ID_Compra"].unique())
+                total_itens = len(df_c_filtered)
                 
-                st.metric("Total de Solicitações de Compras", total_c)
+                cm1, cm2 = st.columns(2)
+                cm1.metric("Total de Pedidos de Compras", total_pedidos)
+                cm2.metric("Total de Itens Solicitados", total_itens)
+                
                 st.markdown("---")
                 
                 col_cg1, col_cg2 = st.columns(2)
+                
+                # Gráfico Compras 1: Categorias (Donut Chart)
                 with col_cg1:
-                    fig_cat = px.pie(df_c, names="Categoria", title="Distribuição de Itens por Categoria")
+                    fig_cat = px.pie(
+                        df_c_filtered, 
+                        names="Categoria", 
+                        title="<b>Distribuição por Categoria de Insumos</b>",
+                        hole=0.5,
+                        color_discrete_sequence=px.colors.qualitative.Safe
+                    )
+                    fig_cat.update_traces(textposition='inside', textinfo='percent+label')
+                    fig_cat.update_layout(**layout_transparente)
                     st.plotly_chart(fig_cat, use_container_width=True)
+
+                # Gráfico Compras 2: Status do Pedido
                 with col_cg2:
-                    fig_status_c = px.histogram(df_c, x="Status", title="Status Geral das Solicitações", color="Status")
+                    fig_status_c = px.histogram(
+                        df_c_filtered, 
+                        x="Status", 
+                        title="<b>Status das Solicitações de Compras</b>",
+                        color="Status",
+                        text_auto=True,
+                        color_discrete_sequence=px.colors.qualitative.Vivid
+                    )
+                    fig_status_c.update_layout(**layout_transparente)
+                    fig_status_c.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
                     st.plotly_chart(fig_status_c, use_container_width=True)
+
+                col_cg3, col_cg4 = st.columns(2)
+
+                # Gráfico Compras 3: Treemap de Categorias e Itens
+                with col_cg3:
+                    fig_tree = px.treemap(
+                        df_c_filtered, 
+                        path=['Categoria', 'Item'], 
+                        title="<b>Hierarquia de Insumos Solicitados</b>",
+                        color_discrete_sequence=px.colors.qualitative.Prism
+                    )
+                    fig_tree.update_layout(**layout_transparente)
+                    st.plotly_chart(fig_tree, use_container_width=True)
+
+                # Gráfico Compras 4: Solicitações por Setor
+                with col_cg4:
+                    df_c_setor = df_c_filtered.groupby("Setor").size().reset_index(name="Quantidade")
+                    fig_c_setor = px.bar(
+                        df_c_setor,
+                        x="Setor",
+                        y="Quantidade",
+                        title="<b>Volume de Solicitações de Compra por Setor</b>",
+                        text_auto=True,
+                        color="Setor",
+                        color_discrete_sequence=px.colors.qualitative.Dark24
+                    )
+                    fig_c_setor.update_layout(**layout_transparente)
+                    fig_c_setor.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
+                    st.plotly_chart(fig_c_setor, use_container_width=True)
