@@ -1705,27 +1705,9 @@ if menu is not None:
                     st.info("Nenhuma compra registrada para assinar.")
                 else:
                     ids_ass = sorted(df_ass["ID_Compra"].unique().tolist(), reverse=True)
-                    col_sel1, col_sel2 = st.columns([1, 2])
-                    
-                    with col_sel1:
-                        id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
-                        rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
-                        row_base_ass = rows_ass.iloc[0]
-                    
-                    with col_sel2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        assinado_por_val = str(row_base_ass.get('Assinado_Por', 'None')).strip()
-                        
-                        if assinado_por_val != "None" and assinado_por_val != "":
-                            st.markdown(
-                                "**Status da Assinatura Digital:** <span style='background-color: #28a745; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🟢 Assinado</span>", 
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            st.markdown(
-                                "**Status da Assinatura Digital:** <span style='background-color: #dc3545; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🔴 Pendente de Assinatura</span>", 
-                                unsafe_allow_html=True
-                            )
+                    id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
+                    rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
+                    row_base_ass = rows_ass.iloc[0]
 
                     st.markdown("---")
                     
@@ -1784,114 +1766,53 @@ if menu is not None:
                                 str(row_base_ass.get("Boleto_Anexado", "None"))
                             ]
                             
-                            assinaram_algo = False
+                            assinados_com_sucesso = 0
                             for doc in documentos_para_assinar:
                                 if doc != "None" and os.path.exists(doc):
-                                    res = carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario)
-                                    if res:
-                                        assinaram_algo = True
+                                    if carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario):
+                                        assinados_com_sucesso += 1
                                         
-                            if assinaram_algo:
+                            if assinados_com_sucesso > 0:
                                 df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
                                 df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success(f"Documentos do Pedido #{id_sel_ass} assinados digitalmente por {st.session_state.usuario}!")
+                                st.success(f"Documento(s) assinado(s) digitalmente por {st.session_state.usuario}!")
                                 st.rerun()
                             else:
-                                st.error("Nenhum documento válido encontrado ou anexado para assinar.")
-                                
-                        st.markdown("---")
-                        
-                        with st.form("form_enviar_email_docs"):
-                            st.markdown("**📧 Enviar Documentos por E-mail:**")
-                            dest_email = st.text_input("E-mail do Destinatário", value="financeiro@stang.com.br")
-                            corpo_email_default = f"Olá,\n\nSegue em anexo a documentação referente ao Pedido de Compra #{id_sel_ass}.\n\nAtenciosamente,\nIntranet Stang"
-                            corpo_msg = st.text_area("Mensagem do E-mail", value=corpo_email_default, height=100)
-                            
-                            btn_enviar_e = st.form_submit_button("🚀 Enviar E-mail com Anexos", use_container_width=True)
-                            
-                            if btn_enviar_e:
-                                if not dest_email:
-                                    st.error("Informe o e-mail do destinatário.")
-                                else:
-                                    df_cfg_latest = pd.read_csv(ARQUIVO_CONFIG_EMAIL, dtype=str)
-                                    cfg_e_dict = df_cfg_latest.iloc[0].to_dict() if not df_cfg_latest.empty else {}
-                                    
-                                    anexos_envio = [
-                                        str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                        str(row_base_ass.get("NF_Anexada", "None")),
-                                        str(row_base_ass.get("Boleto_Anexado", "None"))
-                                    ]
-                                    
-                                    sucesso_e, msg_e = enviar_email_real(
-                                        destinatario=dest_email,
-                                        assunto=f"Documentação do Pedido de Compra #{id_sel_ass} - Intranet Stang",
-                                        corpo=corpo_msg,
-                                        anexos=anexos_envio,
-                                        config=cfg_e_dict
-                                    )
-                                    
-                                    if sucesso_e:
-                                        st.success(f"E-mail enviado com sucesso para {dest_email}!")
-                                    else:
-                                        st.error(f"Erro no envio: {msg_e}")
+                                st.warning("Nenhum documento válido encontrado para assinar.")
 
-                    st.markdown("---")
-                    st.markdown("#### 📄 Visualização de Documentos Vinculados ao Pedido:")
-                    
-                    c_doc1, c_doc2, c_doc3 = st.columns(3)
-                    with c_doc1:
-                        exibir_documento(row_base_ass.get("Orcamento_Assinado", "None"), "Orçamento")
-                    with c_doc2:
-                        exibir_documento(row_base_ass.get("NF_Anexada", "None"), "Nota Fiscal")
-                    with c_doc3:
-                        exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
-
-    # --- TELA 6: DASHBOARD ANALÍTICO ---
+    # --- TELA 6: DASHBOARD DE INDICADORES ---
     elif menu == "📊 Dashboard":
-        st.markdown("# 📊 Painel Geral de Indicadores e Métricas Stang")
+        st.markdown("# 📊 Painel Geral de Indicadores Stang")
         
-        tab_dash1, tab_dash2 = st.tabs(["📊 Indicadores O.S.", "🛒 Indicadores Compras"])
+        df_os_dash = carregar_banco_os()
+        df_compras_dash = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+        df_fms_dash = pd.read_csv(ARQUIVO_FMS, dtype=str)
         
-        with tab_dash1:
-            df_os = carregar_banco_os()
-            if df_os.empty:
-                st.info("Nenhuma O.S. cadastrada para gerar o dashboard.")
+        c_d1, c_d2, c_d3, c_d4 = st.columns(4)
+        
+        with c_d1:
+            st.metric("Total O.S. Abertas", len(df_os_dash[df_os_dash["Status"] != "Finalizada"]))
+        with c_d2:
+            st.metric("Total O.S. Finalizadas", len(df_os_dash[df_os_dash["Status"] == "Finalizada"]))
+        with c_d3:
+            st.metric("Pedidos de Compra", len(df_compras_dash["ID_Compra"].unique()) if not df_compras_dash.empty else 0)
+        with c_d4:
+            st.metric("Formulários (FMs)", len(df_fms_dash) if not df_fms_dash.empty else 0)
+            
+        st.markdown("---")
+        
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            if not df_os_dash.empty:
+                fig_os = px.pie(df_os_dash, names="Status", title="Distribuição de O.S. por Status")
+                st.plotly_chart(fig_os, use_container_width=True)
             else:
-                total_os = len(df_os)
-                abertas = len(df_os[df_os["Status"] == "Em Aberto"])
-                andamento = len(df_os[df_os["Status"] == "Em Andamento"])
-                finalizadas = len(df_os[df_os["Status"] == "Finalizada"])
+                st.info("Sem dados de O.S. para exibir gráfico.")
                 
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total de O.S.", total_os)
-                m2.metric("Em Aberto 🟠", abertas)
-                m3.metric("Em Andamento 🔵", andamento)
-                m4.metric("Finalizadas 🟢", finalizadas)
-                
-                st.markdown("---")
-                
-                col_g1, col_g2 = st.columns(2)
-                with col_g1:
-                    fig_status = px.pie(df_os, names="Status", title="Distribuição de O.S. por Status", hole=0.4)
-                    st.plotly_chart(fig_status, use_container_width=True)
-                with col_g2:
-                    fig_setor = px.bar(df_os, x="Setor", title="Volume de O.S. por Setor Solicitante", color="Setor")
-                    st.plotly_chart(fig_setor, use_container_width=True)
-
-        with tab_dash2:
-            df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-            if df_c.empty:
-                st.info("Nenhuma solicitação de compra cadastrada para gerar o dashboard.")
+        with col_g2:
+            if not df_compras_dash.empty:
+                fig_comp = px.pie(df_compras_dash, names="Status", title="Distribuição de Solicitações de Compras")
+                st.plotly_chart(fig_comp, use_container_width=True)
             else:
-                total_c = len(df_c["ID_Compra"].unique())
-                
-                st.metric("Total de Solicitações de Compras", total_c)
-                st.markdown("---")
-                
-                col_cg1, col_cg2 = st.columns(2)
-                with col_cg1:
-                    fig_cat = px.pie(df_c, names="Categoria", title="Distribuição de Itens por Categoria")
-                    st.plotly_chart(fig_cat, use_container_width=True)
-                with col_cg2:
-                    fig_status_c = px.histogram(df_c, x="Status", title="Status Geral das Solicitações", color="Status")
-                    st.plotly_chart(fig_status_c, use_container_width=True)
+                st.info("Sem dados de Compras para exibir gráfico.")
