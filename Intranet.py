@@ -126,7 +126,6 @@ ARQUIVO_OS = "banco_os.csv"
 ARQUIVO_FMS = "banco_fms.csv"
 ARQUIVO_USERS = "banco_usuarios.csv"
 ARQUIVO_COMPRAS = "banco_compras.csv"
-ARQUIVO_CONFIG_EMAIL = "banco_email_config.csv"
 
 def inicializar_bancos():
     colunas_os = [
@@ -173,7 +172,10 @@ def inicializar_bancos():
             df_c.to_csv(ARQUIVO_COMPRAS, index=False)
         
     todos_menus_str = ",".join(TODOS_MENUS)
-    colunas_users = ["Usuario", "Senha", "Validade", "Permissoes", "Admin", "Assinatura_PNG", "Email_Usuario"]
+    colunas_users = [
+        "Usuario", "Senha", "Validade", "Permissoes", "Admin", "Assinatura_PNG", 
+        "Email_Usuario", "Senha_App_Email", "Servidor_SMTP", "Porta_SMTP"
+    ]
     
     if not os.path.exists(ARQUIVO_USERS):
         df_users = pd.DataFrame([{
@@ -183,7 +185,10 @@ def inicializar_bancos():
             "Permissoes": todos_menus_str,
             "Admin": "Sim",
             "Assinatura_PNG": "None",
-            "Email_Usuario": "thiagosc@stang.com.br"
+            "Email_Usuario": "thiagosc@stang.com.br",
+            "Senha_App_Email": "",
+            "Servidor_SMTP": "smtp.gmail.com",
+            "Porta_SMTP": "587"
         }])
         df_users.to_csv(ARQUIVO_USERS, index=False)
     else:
@@ -191,7 +196,14 @@ def inicializar_bancos():
         mudou_u = False
         for col in colunas_users:
             if col not in df_users.columns:
-                df_users[col] = "None" if col in ["Assinatura_PNG", "Email_Usuario"] else ""
+                if col in ["Assinatura_PNG"]:
+                    df_users[col] = "None"
+                elif col == "Servidor_SMTP":
+                    df_users[col] = "smtp.gmail.com"
+                elif col == "Porta_SMTP":
+                    df_users[col] = "587"
+                else:
+                    df_users[col] = ""
                 mudou_u = True
         if mudou_u:
             df_users.to_csv(ARQUIVO_USERS, index=False)
@@ -204,20 +216,13 @@ def inicializar_bancos():
                 "Permissoes": todos_menus_str,
                 "Admin": "Sim",
                 "Assinatura_PNG": "None",
-                "Email_Usuario": "thiagosc@stang.com.br"
+                "Email_Usuario": "thiagosc@stang.com.br",
+                "Senha_App_Email": "",
+                "Servidor_SMTP": "smtp.gmail.com",
+                "Porta_SMTP": "587"
             }])
             df_users = pd.concat([df_users, novo_mestre], ignore_index=True)
             df_users.to_csv(ARQUIVO_USERS, index=False)
-
-    if not os.path.exists(ARQUIVO_CONFIG_EMAIL):
-        df_cfg_e = pd.DataFrame([{
-            "Email_Remetente": "compras@stang.com.br",
-            "Nome_Remetente": "Intranet Stang Compras",
-            "API_Key": "",
-            "Servidor_SMTP": "smtp.gmail.com",
-            "Porta_SMTP": "587"
-        }])
-        df_cfg_e.to_csv(ARQUIVO_CONFIG_EMAIL, index=False)
 
 inicializar_bancos()
 
@@ -348,15 +353,16 @@ def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_u
 def enviar_email_real(destinatario, assunto, corpo, anexos, config):
     try:
         remetente = config.get("Email_Remetente", "")
-        senha_app = config.get("API_Key", "")
+        senha_app = config.get("Senha_App", "")
         servidor_smtp = config.get("Servidor_SMTP", "smtp.gmail.com")
         porta_smtp = int(config.get("Porta_SMTP", "587"))
+        nome_remetente = config.get("Nome_Remetente", "Intranet Stang")
         
         if not remetente or not senha_app:
-            return False, "E-mail remetente ou Senha/Chave API não configurados!"
+            return False, "E-mail remetente ou Senha de App não configurados para este usuário na tela de Login!"
             
         msg = MIMEMultipart()
-        msg['From'] = f"{config.get('Nome_Remetente', 'Intranet Stang')} <{remetente}>"
+        msg['From'] = f"{nome_remetente} <{remetente}>"
         msg['To'] = destinatario
         msg['Subject'] = assunto
         
@@ -434,7 +440,7 @@ if not st.session_state.autenticado:
                             st.success("Login efetuado com sucesso! Carregando...")
                             st.rerun()
                             
-        with st.expander("🔑 Gerenciar Usuários e Assinatura Digital"):
+        with st.expander("🔑 Gerenciar Usuários, Assinatura Digital e E-mail"):
             senha_master_input = st.text_input("Insira a Senha Master ou Senha de Administrador", type="password", key="master_unlock")
             
             df_users_check_master = pd.read_csv(ARQUIVO_USERS, dtype=str)
@@ -445,14 +451,13 @@ if not st.session_state.autenticado:
             if libera_gestao:
                 st.success("Painel de gestão de usuários liberado:")
                 
-                aba_ges1, aba_ges2 = st.tabs(["➕ Cadastrar Novo Usuário", "✏️ Editar / ✍️ Assinatura PNG / 🗑️ Excluir"])
+                aba_ges1, aba_ges2 = st.tabs(["➕ Cadastrar Novo Usuário", "✏️ Editar / ✍️ Assinatura PNG / 📧 Config. E-mail / 🗑️ Excluir"])
                 
                 with aba_ges1:
                     with st.form("form_gestao_login"):
                         st.markdown("<b>Novo Usuário a Cadastrar:</b>", unsafe_allow_html=True)
                         n_login = st.text_input("Login do Novo Usuário").strip()
                         n_senha = st.text_input("Senha do Novo Usuário", type="password")
-                        n_email = st.text_input("E-mail do Usuário", value="")
                         n_val = st.selectbox("Validade", ["Vitalício", "Definir Data Limite"])
                         
                         n_data = datetime.now().date() + timedelta(days=30)
@@ -467,6 +472,14 @@ if not st.session_state.autenticado:
                             options=TODOS_MENUS,
                             default=["📝 Nova O.S.", "🛒 Solicitações de Compras"]
                         )
+                        
+                        st.markdown("---")
+                        st.markdown("<b>📧 Configuração Individual de E-mail (SMTP):</b>", unsafe_allow_html=True)
+                        n_email = st.text_input("E-mail do Usuário", value="")
+                        n_senha_app = st.text_input("Senha de App / Token SMTP", type="password", key="n_senha_app")
+                        c_smtp1, c_smtp2 = st.columns(2)
+                        n_servidor_smtp = c_smtp1.text_input("Servidor SMTP", value="smtp.gmail.com")
+                        n_porta_smtp = c_smtp2.text_input("Porta SMTP", value="587")
                             
                         btn_cad_login = st.form_submit_button("Cadastrar Novo Usuário")
                         
@@ -489,7 +502,10 @@ if not st.session_state.autenticado:
                                         "Permissoes": perm_str,
                                         "Admin": n_admin_opt,
                                         "Assinatura_PNG": "None",
-                                        "Email_Usuario": n_email
+                                        "Email_Usuario": n_email,
+                                        "Senha_App_Email": n_senha_app,
+                                        "Servidor_SMTP": n_servidor_smtp,
+                                        "Porta_SMTP": n_porta_smtp
                                     }
                                     df_u = pd.concat([df_u, pd.DataFrame([novo_reg])], ignore_index=True)
                                     df_u.to_csv(ARQUIVO_USERS, index=False)
@@ -503,13 +519,12 @@ if not st.session_state.autenticado:
                     lista_usuarios_edit = df_u_atual["Usuario"].tolist()
                     if lista_usuarios_edit:
                         st.markdown("---")
-                        user_selecionado = st.selectbox("Selecione o usuário para Editar / Vincular Assinatura", lista_usuarios_edit)
+                        user_selecionado = st.selectbox("Selecione o usuário para Editar / Configurar", lista_usuarios_edit)
                         row_u_edit = df_u_atual[df_u_atual["Usuario"] == user_selecionado].iloc[0]
                         
                         with st.form("form_editar_usuario"):
                             st.subheader(f"Editando Usuário: {user_selecionado}")
                             edit_senha = st.text_input("Nova Senha", value=str(row_u_edit["Senha"]), type="password")
-                            edit_email = st.text_input("E-mail do Usuário", value=str(row_u_edit.get("Email_Usuario", "")))
                             
                             val_atual_str = str(row_u_edit["Validade"])
                             is_vitalicio = val_atual_str == "Vitalício"
@@ -534,6 +549,14 @@ if not st.session_state.autenticado:
                                 default=perm_atuais_list
                             )
                             
+                            st.markdown("---")
+                            st.markdown("<b>📧 Configuração Individual de E-mail (SMTP):</b>", unsafe_allow_html=True)
+                            edit_email = st.text_input("E-mail do Usuário", value=str(row_u_edit.get("Email_Usuario", "")))
+                            edit_senha_app = st.text_input("Senha de App / Token SMTP", value=str(row_u_edit.get("Senha_App_Email", "")), type="password")
+                            ce_smtp1, ce_smtp2 = st.columns(2)
+                            edit_servidor_smtp = ce_smtp1.text_input("Servidor SMTP Host", value=str(row_u_edit.get("Servidor_SMTP", "smtp.gmail.com")))
+                            edit_porta_smtp = ce_smtp2.text_input("Porta SMTP", value=str(row_u_edit.get("Porta_SMTP", "587")))
+
                             st.markdown("---")
                             st.markdown("✍️ **Assinatura Digital em PNG:**")
                             path_ass_atual = str(row_u_edit.get("Assinatura_PNG", "None"))
@@ -562,6 +585,9 @@ if not st.session_state.autenticado:
                                             
                                     df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Senha"] = edit_senha
                                     df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Email_Usuario"] = edit_email
+                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Senha_App_Email"] = edit_senha_app
+                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Servidor_SMTP"] = edit_servidor_smtp
+                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Porta_SMTP"] = edit_porta_smtp
                                     df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Validade"] = novo_val_str
                                     df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Admin"] = edit_admin_opt
                                     df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Permissoes"] = nova_perm_str
@@ -1521,40 +1547,8 @@ if menu is not None:
         # ABA 4 - ASSINATURAS E ENVIOS DE E-MAIL (SOMENTE ADMIN)
         if is_user_admin:
             with tab_comp4:
-                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto) e Configurações de E-mail SMTP")
+                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto)")
                 
-                # --- SUB-SEÇÃO 1: CONFIGURAÇÃO DE E-MAIL REMETENTE / SMTP ---
-                with st.expander("⚙️ Configurações de E-mail para Envio Real (SMTP / Gmail / Outlook)"):
-                    df_email_cfg = pd.read_csv(ARQUIVO_CONFIG_EMAIL, dtype=str)
-                    cfg_row = df_email_cfg.iloc[0] if not df_email_cfg.empty else {}
-                    
-                    with st.form("form_configuracao_email_api"):
-                        st.markdown("**Cadastrar / Configurar Conta Remetente:**")
-                        c_e1, c_e2 = st.columns(2)
-                        with c_e1:
-                            remetente_email = st.text_input("E-mail Remetente", value=str(cfg_row.get("Email_Remetente", "compras@stang.com.br")))
-                            remetente_nome = st.text_input("Nome do Remetente", value=str(cfg_row.get("Nome_Remetente", "Intranet Stang Compras")))
-                        with c_e2:
-                            api_key_str = st.text_input("Senha de App / Token SMTP", value=str(cfg_row.get("API_Key", "")), type="password")
-                            servidor_smtp = st.text_input("Servidor SMTP Host", value=str(cfg_row.get("Servidor_SMTP", "smtp.gmail.com")))
-                            porta_smtp_in = st.text_input("Porta SMTP", value=str(cfg_row.get("Porta_SMTP", "587")))
-                            
-                        btn_salvar_email_cfg = st.form_submit_button("💾 Salvar Configurações de E-mail")
-                        if btn_salvar_email_cfg:
-                            nova_cfg = pd.DataFrame([{
-                                "Email_Remetente": remetente_email,
-                                "Nome_Remetente": remetente_nome,
-                                "API_Key": api_key_str,
-                                "Servidor_SMTP": servidor_smtp,
-                                "Porta_SMTP": porta_smtp_in
-                            }])
-                            nova_cfg.to_csv(ARQUIVO_CONFIG_EMAIL, index=False)
-                            st.success("Configurações de E-mail salvas com sucesso!")
-                            st.rerun()
-
-                st.markdown("---")
-                
-                # --- SUB-SEÇÃO 2: ASSINATURAS E ANEXOS ---
                 df_ass = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
                 if df_ass.empty:
                     st.info("Nenhuma compra registrada para assinar.")
@@ -1601,6 +1595,33 @@ if menu is not None:
                                 st.rerun()
                             else:
                                 st.error("Nenhum documento válido encontrado/anexado para assinar.")
+
+                    # --- QUADRO DE STATUS INTUITIVO DO PEDIDO ---
+                    p_orc = row_base_ass.get("Orcamento_Assinado", "None")
+                    p_nf = row_base_ass.get("NF_Anexada", "None")
+                    p_bol = row_base_ass.get("Boleto_Anexado", "None")
+                    p_ass = row_base_ass.get("Assinado_Por", "None")
+                    
+                    has_orc = pd.notna(p_orc) and str(p_orc).strip() != "None" and os.path.exists(str(p_orc))
+                    has_nf = pd.notna(p_nf) and str(p_nf).strip() != "None" and os.path.exists(str(p_nf))
+                    has_bol = pd.notna(p_bol) and str(p_bol).strip() != "None" and os.path.exists(str(p_bol))
+                    has_signature = pd.notna(p_ass) and str(p_ass).strip() != "None" and str(p_ass).strip() != ""
+                    
+                    st.markdown("#### 📊 Status da Documentação")
+                    col_st_doc1, col_st_doc2 = st.columns(2)
+                    
+                    with col_st_doc1:
+                        txt_orc = "✅ Sim" if has_orc else "❌ Não"
+                        txt_nf = "✅ Sim" if has_nf else "❌ Não"
+                        txt_bol = "✅ Sim" if has_bol else "❌ Não"
+                        status_anexos = f"Orçamento: {txt_orc} | NF: {txt_nf} | Boleto: {txt_bol}"
+                        st.metric(label="Status de Anexos do Pedido", value=status_anexos)
+                        
+                    with col_st_doc2:
+                        txt_ass = f"✅ Assinado por {p_ass}" if has_signature else "❌ Não Assinado"
+                        st.metric(label="Status de Assinatura Digital", value=txt_ass)
+
+                    st.markdown("---")
 
                     # Descrição/Resumo do pedido para saber a que se refere o número do pedido
                     itens_do_pedido_str = ", ".join([f"{r['Item']} (Qtd: {r['Quantidade']})" for _, r in rows_ass.iterrows()])
@@ -1655,8 +1676,7 @@ if menu is not None:
                         with st.form("form_enviar_email_docs"):
                             st.markdown("**📧 Enviar Documentos por E-mail:**")
                             dest_email = st.text_input("E-mail do Destinatário", value="financeiro@stang.com.br")
-                            corpo_email_default = f"Olá,\n\nSegue em anexo a documentação referente ao Pedido de Compra #{id_sel_ass}.\n\nAtenciosamente,\nIntranet Stang"
-                            corpo_msg = st.text_area("Mensagem do E-mail", value=corpo_email_default, height=100)
+                            obs_email = st.text_area("Observações do E-mail", value="", height=100)
                             
                             btn_enviar_e = st.form_submit_button("🚀 Enviar E-mail com Anexos", use_container_width=True)
                             
@@ -1664,27 +1684,41 @@ if menu is not None:
                                 if not dest_email:
                                     st.error("Informe o e-mail do destinatário.")
                                 else:
-                                    df_cfg_latest = pd.read_csv(ARQUIVO_CONFIG_EMAIL, dtype=str)
-                                    cfg_e_dict = df_cfg_latest.iloc[0].to_dict() if not df_cfg_latest.empty else {}
+                                    df_u_l = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                                    row_u_l = df_u_l[df_u_l["Usuario"].str.lower() == st.session_state.usuario.lower()]
                                     
-                                    anexos_envio = [
-                                        str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                        str(row_base_ass.get("NF_Anexada", "None")),
-                                        str(row_base_ass.get("Boleto_Anexado", "None"))
-                                    ]
-                                    
-                                    sucesso_e, msg_e = enviar_email_real(
-                                        destinatario=dest_email,
-                                        assunto=f"Documentação do Pedido de Compra #{id_sel_ass} - Intranet Stang",
-                                        corpo=corpo_msg,
-                                        anexos=anexos_envio,
-                                        config=cfg_e_dict
-                                    )
-                                    
-                                    if sucesso_e:
-                                        st.success(f"E-mail enviado com sucesso para {dest_email}!")
+                                    if row_u_l.empty:
+                                        st.error("Dados de usuário não encontrados para envio.")
                                     else:
-                                        st.error(f"Erro no envio: {msg_e}")
+                                        u_row_dict = row_u_l.iloc[0].to_dict()
+                                        cfg_e_dict = {
+                                            "Email_Remetente": u_row_dict.get("Email_Usuario", ""),
+                                            "Senha_App": u_row_dict.get("Senha_App_Email", ""),
+                                            "Servidor_SMTP": u_row_dict.get("Servidor_SMTP", "smtp.gmail.com"),
+                                            "Porta_SMTP": u_row_dict.get("Porta_SMTP", "587"),
+                                            "Nome_Remetente": st.session_state.usuario
+                                        }
+                                        
+                                        anexos_envio = [
+                                            str(row_base_ass.get("Orcamento_Assinado", "None")),
+                                            str(row_base_ass.get("NF_Anexada", "None")),
+                                            str(row_base_ass.get("Boleto_Anexado", "None"))
+                                        ]
+                                        
+                                        corpo_dinamico = f"Documentação referente ao Pedido de Compra #{id_sel_ass}.\n\nObservações: {obs_email}" if obs_email else f"Documentação referente ao Pedido de Compra #{id_sel_ass}."
+                                        
+                                        sucesso_e, msg_e = enviar_email_real(
+                                            destinatario=dest_email,
+                                            assunto=f"Documentação do Pedido de Compra #{id_sel_ass} - Intranet Stang",
+                                            corpo=corpo_dinamico,
+                                            anexos=anexos_envio,
+                                            config=cfg_e_dict
+                                        )
+                                        
+                                        if sucesso_e:
+                                            st.success(f"E-mail enviado com sucesso para {dest_email}!")
+                                        else:
+                                            st.error(f"Erro no envio: {msg_e}")
 
                     st.markdown("---")
                     st.markdown("#### 📄 Visualização de Documentos Vinculados ao Pedido:")
