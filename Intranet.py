@@ -229,7 +229,7 @@ def carregar_banco_os():
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
 
-# Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64 para evitar bloqueio Chrome HTTP)
+# Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64)
 def exibir_documento(caminho_arquivo, titulo):
     if pd.isna(caminho_arquivo) or str(caminho_arquivo).strip() in ["None", ""]:
         st.warning(f"📄 **{titulo}:** Não anexado.")
@@ -259,7 +259,7 @@ def exibir_documento(caminho_arquivo, titulo):
             pdf_display = f'''
                 <object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="450px">
                     <embed src="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="450px"/>
-                    <p style="font-size: 12px; color: #666;">Se o seu navegador não exibir o PDF acima automaticamente, <a href="data:application/pdf;base64,{base64_pdf}" download="{os.path.basename(str(caminho_arquivo))}">clique aqui para baixar diretamente em formato seguro Base64</a>.</p>
+                    <p style="font-size: 12px; color: #666;">Se o seu navegador não exibir o PDF acima automaticamente, <a href="data:application/pdf;base64,{base64_pdf}" download="{os.path.basename(str(caminho_arquivo))}">clique aqui para baixar diretamente</a>.</p>
                 </object>
             '''
             st.markdown(pdf_display, unsafe_allow_html=True)
@@ -353,7 +353,7 @@ def enviar_email_real(destinatario, assunto, corpo, anexos, config):
         porta_smtp = int(config.get("Porta_SMTP", "587"))
         
         if not remetente or not senha_app:
-            return False, "E-mail remetente ou Senha/Chave API não configurados nas configurações de E-mail!"
+            return False, "E-mail remetente ou Senha/Chave API não configurados!"
             
         msg = MIMEMultipart()
         msg['From'] = f"{config.get('Nome_Remetente', 'Intranet Stang')} <{remetente}>"
@@ -383,7 +383,7 @@ def enviar_email_real(destinatario, assunto, corpo, anexos, config):
     except Exception as e:
         return False, f"Falha no envio de e-mail: {str(e)}"
 
-# --- SISTEMA DE AUTENTICAÇÃO E GERENCIAMENTO NA TELA DE LOGIN ---
+# --- SISTEMA DE AUTENTICAÇÃO NA TELA DE LOGIN ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
     st.session_state.usuario = ""
@@ -443,7 +443,7 @@ if not st.session_state.autenticado:
             libera_gestao = (senha_master_input == "master") or (senha_master_input in admins_senhas and senha_master_input != "")
             
             if libera_gestao:
-                st.success("Painel de gestão de usuários liberado com sucesso:")
+                st.success("Painel de gestão de usuários liberado:")
                 
                 aba_ges1, aba_ges2 = st.tabs(["➕ Cadastrar Novo Usuário", "✏️ Editar / ✍️ Assinatura PNG / 🗑️ Excluir"])
                 
@@ -459,7 +459,7 @@ if not st.session_state.autenticado:
                         if n_val == "Definir Data Limite":
                             n_data = st.date_input("Data Limite de Acesso")
                             
-                        n_admin_opt = st.selectbox("Perfil de Administrador (Acesso total / Gestão)", ["Não", "Sim"])
+                        n_admin_opt = st.selectbox("Perfil de Administrador", ["Não", "Sim"])
                             
                         st.markdown("<b>Permissões de Acesso aos Menus:</b>", unsafe_allow_html=True)
                         n_permissoes = st.multiselect(
@@ -498,18 +498,17 @@ if not st.session_state.autenticado:
 
                 with aba_ges2:
                     df_u_atual = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                    st.markdown("<b>Usuários Ativos, Permissões e Perfis:</b>", unsafe_allow_html=True)
                     st.dataframe(df_u_atual[["Usuario", "Email_Usuario", "Validade", "Admin", "Assinatura_PNG"]], use_container_width=True)
                     
                     lista_usuarios_edit = df_u_atual["Usuario"].tolist()
                     if lista_usuarios_edit:
                         st.markdown("---")
-                        user_selecionado = st.selectbox("Selecione o usuário para Editar / Vincular Assinatura PNG", lista_usuarios_edit)
+                        user_selecionado = st.selectbox("Selecione o usuário para Editar / Vincular Assinatura", lista_usuarios_edit)
                         row_u_edit = df_u_atual[df_u_atual["Usuario"] == user_selecionado].iloc[0]
                         
                         with st.form("form_editar_usuario"):
                             st.subheader(f"Editando Usuário: {user_selecionado}")
-                            edit_senha = st.text_input("Nova Senha (deixe a atual ou digite nova)", value=str(row_u_edit["Senha"]), type="password")
+                            edit_senha = st.text_input("Nova Senha", value=str(row_u_edit["Senha"]), type="password")
                             edit_email = st.text_input("E-mail do Usuário", value=str(row_u_edit.get("Email_Usuario", "")))
                             
                             val_atual_str = str(row_u_edit["Validade"])
@@ -523,14 +522,14 @@ if not st.session_state.autenticado:
                                 except:
                                     pass
                             if edit_val_tipo == "Definir Data Limite":
-                                edit_data = st.date_input("Nova Data Limite de Acesso", value=edit_data)
+                                edit_data = st.date_input("Nova Data Limite", value=edit_data)
                                 
                             admin_atual_str = str(row_u_edit.get("Admin", "Não"))
-                            edit_admin_opt = st.selectbox("Perfil de Administrador (Acesso total / Gestão)", ["Não", "Sim"], index=0 if admin_atual_str != "Sim" else 1)
+                            edit_admin_opt = st.selectbox("Perfil de Administrador", ["Não", "Sim"], index=0 if admin_atual_str != "Sim" else 1)
                                 
                             perm_atuais_list = [p.strip() for p in str(row_u_edit["Permissoes"]).split(",") if p.strip() in TODOS_MENUS]
                             edit_permissoes = st.multiselect(
-                                "Permissões de Acesso aos Menus:",
+                                "Permissões de Acesso:",
                                 options=TODOS_MENUS,
                                 default=perm_atuais_list
                             )
@@ -541,11 +540,11 @@ if not st.session_state.autenticado:
                             if path_ass_atual != "None" and os.path.exists(path_ass_atual):
                                 st.image(path_ass_atual, caption=f"Assinatura Atual de {user_selecionado}", width=200)
                             else:
-                                st.caption("Nenhuma assinatura digital em PNG cadastrada para este usuário.")
+                                st.caption("Nenhuma assinatura digital cadastrada.")
                                 
                             up_assinatura_png = st.file_uploader(f"Upload da Assinatura PNG para {user_selecionado}", type=["png"])
                             
-                            btn_salvar_edicao = st.form_submit_button("💾 Salvar Alterações e Vincular Assinatura PNG")
+                            btn_salvar_edicao = st.form_submit_button("💾 Salvar Alterações")
                             
                             if btn_salvar_edicao:
                                 if not edit_permissoes:
@@ -569,26 +568,26 @@ if not st.session_state.autenticado:
                                     df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Assinatura_PNG"] = path_salvo
                                     
                                     df_u_atual.to_csv(ARQUIVO_USERS, index=False)
-                                    st.success(f"Usuário '{user_selecionado}' e Assinatura PNG vinculada com sucesso!")
+                                    st.success(f"Usuário '{user_selecionado}' atualizado!")
                                     st.rerun()
 
                         total_admins = len(df_u_atual[df_u_atual["Admin"] == "Sim"])
                         is_este_admin = str(row_u_edit.get("Admin")) == "Sim"
                         
                         if total_admins <= 1 and is_este_admin:
-                            st.info("⚠️ Este é o único usuário administrador ativo e não pode ser excluído.")
+                            st.info("⚠️ Este é o único administrador ativo.")
                         else:
-                            if st.button(f"🗑️ Excluir Definitivamente o Usuário '{user_selecionado}'", type="primary"):
+                            if st.button(f"🗑️ Excluir Usuário '{user_selecionado}'", type="primary"):
                                 df_u_atual = df_u_atual[df_u_atual["Usuario"] != user_selecionado]
                                 df_u_atual.to_csv(ARQUIVO_USERS, index=False)
-                                st.success(f"Usuário '{user_selecionado}' removido com sucesso!")
+                                st.success(f"Usuário '{user_selecionado}' removido!")
                                 st.rerun()
             elif senha_master_input != "":
                 st.error("Senha Master ou Administrador incorreta.")
                     
     st.stop()
 
-# --- DETERMINAR MENUS PERMITIDOS PARA O USUÁRIO LOGADO ---
+# --- DETERMINAR MENUS PERMITIDOS ---
 df_users_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
 user_logado_row = df_users_check[df_users_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
 
@@ -601,7 +600,7 @@ if not user_logado_row.empty and pd.notna(user_logado_row.iloc[0].get("Permissoe
 else:
     menus_disponiveis = TODOS_MENUS
 
-# --- BARRA LATERAL (MENU) COM LOGO STANG ---
+# --- BARRA LATERAL (MENU) ---
 with st.sidebar:
     if os.path.exists("logo.png"):
         st.image("logo.png", use_container_width=True)
@@ -612,12 +611,12 @@ with st.sidebar:
     if menus_disponiveis:
         menu = st.radio("Navegação Principal", menus_disponiveis)
     else:
-        st.warning("⚠️ Você não possui permissão para acessar nenhum menu. Contate o administrador.")
+        st.warning("⚠️ Você não possui permissão para acessar nenhum menu.")
         menu = None
     
     st.markdown("---")
     
-    if st.button("🔄 Atualizar Dados da Tela", use_container_width=True):
+    if st.button("🔄 Atualizar Dados", use_container_width=True):
         st.rerun()
         
     if st.button("🚪 Sair / Logout", use_container_width=True):
@@ -677,13 +676,11 @@ if menu is not None:
                     }
                     df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
                     df.to_csv(ARQUIVO_OS, index=False)
-                    st.success(f"Ordem de Serviço #{novo_id} gerada com sucesso no sistema Stang!")
+                    st.success(f"Ordem de Serviço #{novo_id} gerada com sucesso!")
                     st.rerun()
 
         df_os_view = carregar_banco_os()
-        if df_os_view.empty:
-            st.info("Nenhuma Ordem de Serviço registrada até o momento.")
-        else:
+        if not df_os_view.empty:
             dias_prioridade_map = {"URGENTE": 1, "ALTA": 5, "MÉDIA": 15, "MEDIA": 15, "BAIXA": 30}
             
             def calcular_vencimento_os_view(row):
@@ -716,7 +713,7 @@ if menu is not None:
             cols_exibicao = ["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Prazo_Limite", "Status_Prazo", "Status", "Equipamento", "Descricao", "finalizado_por"]
             st.dataframe(df_os_view[cols_exibicao].sort_values(by="ID", ascending=False), use_container_width=True)
 
-    # --- TELA 2: GERENCIAR, EDITAR, FINALIZAR E EXCLUIR O.S. ---
+    # --- TELA 2: GERENCIAR O.S. ---
     elif menu == "📋 Gerenciar O.S.":
         st.markdown("# 📋 Painel de Controle e Gestão de O.S.")
         df = carregar_banco_os()
@@ -760,7 +757,7 @@ if menu is not None:
                 filtro_setor = st.selectbox("Filtrar por Setor", ["Todos"] + list(df["Setor"].unique()))
             with c3:
                 lista_finalizado_por_opts = ["Todos"] + sorted([x for x in df["finalizado_por"].dropna().unique().tolist() if str(x).strip() != ""])
-                filtro_finalizador = st.selectbox("Filtrar por Quem Efetuou o Serviço", lista_finalizado_por_opts)
+                filtro_finalizador = st.selectbox("Filtrar por Executante", lista_finalizado_por_opts)
                 
             df_filtered = df.copy()
             if filtro_status != "Todos":
@@ -780,7 +777,7 @@ if menu is not None:
             with aba_os_ges1:
                 ids_os_lista = sorted(df["ID"].tolist(), reverse=True)
                 if ids_os_lista:
-                    os_selecionada_id = st.selectbox("Selecione o ID da O.S. para Editar ou Finalizar", ids_os_lista)
+                    os_selecionada_id = st.selectbox("Selecione o ID da O.S.", ids_os_lista)
                     row_edit_os = df[df["ID"] == os_selecionada_id].iloc[0]
                     
                     with st.form("form_editar_os_detalhes"):
@@ -795,7 +792,7 @@ if menu is not None:
                             
                             prio_atual = str(row_edit_os["Prioridade"]).upper()
                             idx_prio = ["BAIXA", "MÉDIA", "ALTA", "URGENTE"].index(prio_atual) if prio_atual in ["BAIXA", "MÉDIA", "ALTA", "URGENTE"] else 0
-                            edit_prio = st.selectbox("Prioridade (Urgente:1d, Alta:5d, Média:15d, Baixa:30d)", ["BAIXA", "MÉDIA", "ALTA", "URGENTE"], index=idx_prio)
+                            edit_prio = st.selectbox("Prioridade", ["BAIXA", "MÉDIA", "ALTA", "URGENTE"], index=idx_prio)
                         with col_e3:
                             status_atual_str = str(row_edit_os["Status"])
                             status_opcoes = ["Em Aberto", "Em Andamento", "Finalizada"]
@@ -803,7 +800,7 @@ if menu is not None:
                             edit_status = st.selectbox("Status", status_opcoes, index=idx_st)
                             
                             finalizado_por_ant = str(row_edit_os["finalizado_por"]) if pd.notna(row_edit_os["finalizado_por"]) and str(row_edit_os["finalizado_por"]).strip() != "" else st.session_state.usuario.upper()
-                            edit_finalizado_por = st.text_input("Quem efetuou o serviço (Responsável)", value=finalizado_por_ant)
+                            edit_finalizado_por = st.text_input("Responsável pelo serviço", value=finalizado_por_ant)
 
                         edit_desc = st.text_area("Descrição do Problema", value=str(row_edit_os["Descricao"]))
                         
@@ -817,7 +814,7 @@ if menu is not None:
                             
                         col_b_f1, col_b_f2 = st.columns(2)
                         with col_b_f1:
-                            btn_salvar_alt = st.form_submit_button("💾 Salvar Alterações da O.S.")
+                            btn_salvar_alt = st.form_submit_button("💾 Salvar Alterações")
                         with col_b_f2:
                             btn_finalizar_direto = st.form_submit_button("✅ Finalizar O.S. Imediatamente")
                             
@@ -857,17 +854,17 @@ if menu is not None:
             with aba_os_ges2:
                 col_del1, col_del2 = st.columns([2, 1])
                 with col_del1:
-                    os_para_excluir = st.selectbox("Selecione o ID da O.S. para Exclusão Definitiva", df["ID"].tolist(), key="select_del_os")
+                    os_para_excluir = st.selectbox("Selecione o ID da O.S. para Exclusão", df["ID"].tolist(), key="select_del_os")
                 with col_del2:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("🗑️ Excluir O.S. Selecionada", type="primary"):
                         df = df[df["ID"] != os_para_excluir]
                         df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
                         df_to_save.to_csv(ARQUIVO_OS, index=False)
-                        st.success(f"Ordem de Serviço #{os_para_excluir} excluída com sucesso!")
+                        st.success(f"Ordem de Serviço #{os_para_excluir} excluída!")
                         st.rerun()
 
-    # --- TELA 3: IMPRIMIR O.S. E RELATÓRIO DE O.S. ---
+    # --- TELA 3: IMPRIMIR O.S. ---
     elif menu == "🖨️ Imprimir O.S.":
         st.markdown("# 🖨️ Emissão e Relatórios de O.S.")
         df = carregar_banco_os()
@@ -911,7 +908,7 @@ if menu is not None:
 </head>
 <body>
     <div class="print-btn-container">
-        <button class="btn-imprimir" onclick="window.print()">🖨️ Clique Aqui para Imprimir Apenas esta O.S.</button>
+        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir O.S.</button>
     </div>
     <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
         <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
@@ -968,7 +965,7 @@ if menu is not None:
         <table style="width: 100%; margin-top: 35px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
             <tr>
                 <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Manutenção</b></td>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Responsável pelo Serviço / Executante ({finalizador_val})</b></td>
+                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Responsável pelo Serviço ({finalizador_val})</b></td>
             </tr>
         </table>
     </div>
@@ -1013,101 +1010,10 @@ if menu is not None:
                     df_f_rep = df_f_rep[df_f_rep['Dia'].astype(str) == filtro_dia_rep]
                 
                 st.markdown("---")
-                st.markdown(f"**Total de O.S. encontradas com os filtros selecionados:** {len(df_f_rep)}")
+                st.markdown(f"**Total de O.S. encontradas:** {len(df_f_rep)}")
                 
-                if df_f_rep.empty:
-                    st.warning("Nenhuma Ordem de Serviço encontrada com os filtros informados.")
-                else:
+                if not df_f_rep.empty:
                     st.dataframe(df_f_rep[["ID", "Data_Criacao", "Solicitante", "Setor", "Equipamento", "Tipo_Manutencao", "Prioridade", "Status", "Solucao", "finalizado_por"]], use_container_width=True)
-                    
-                    logo_base64_rep = ""
-                    if os.path.exists("logo.png"):
-                        with open("logo.png", "rb") as img_file:
-                            logo_base64_rep = base64.b64encode(img_file.read()).decode()
-                            
-                    linhas_os_html = ""
-                    for _, row in df_f_rep.sort_values(by="ID", ascending=False).iterrows():
-                        linhas_os_html += f"""
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;"><b>{row['ID']}</b></td>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;">{row['Data_Criacao']}</td>
-                            <td style="border: 1px solid #000; padding: 6px;">{row['Solicitante']} ({row['Setor']})</td>
-                            <td style="border: 1px solid #000; padding: 6px;">{row['Equipamento']}</td>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;">{row['Tipo_Manutencao']}</td>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;">{row['Prioridade']}</td>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;"><b>{row['Status']}</b></td>
-                            <td style="border: 1px solid #000; padding: 6px;">{row['Solucao']}</td>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;">{row['finalizado_por']}</td>
-                        </tr>
-                        """
-                        
-                    print_rel_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
-        .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
-        .btn-imprimir {{ background-color: #28a745; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-        @media print {{ .print-btn-container {{ display: none !important; }} body {{ padding: 0; }} }}
-    </style>
-</head>
-<body>
-    <div class="print-btn-container">
-        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Relatório Filtrado de O.S.</button>
-    </div>
-    <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 1000px; margin: auto;">
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
-            <tr>
-                <td style="width: 25%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
-                    <img src="data:image/png;base64,{logo_base64_rep}" style="max-height: 45px; max-width: 100%;">
-                </td>
-                <td style="width: 50%; border: 1px solid #000; text-align: center; vertical-align: middle;">
-                    <h3 style="margin: 0; color: #000 !important; font-size: 16px;">Relatório Geral de Ordens de Serviço (O.S.)</h3>
-                </td>
-                <td style="width: 25%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
-                    <b></b><br>Data: {datetime.now().strftime('%d/%m/%Y')}
-                </td>
-            </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important; margin-top: 5px;">
-            <tr>
-                <td style="border: 1px solid #000; padding: 6px;"><b>Filtros Aplicados:</b> Status: {filtro_status_rep} | Ano: {filtro_ano_rep} | Mês/Ano: {filtro_mes_rep} | Dia: {filtro_dia_rep}</td>
-                <td style="border: 1px solid #000; padding: 6px; width: 25%; text-align: center;"><b>Total Registros:</b> {len(df_f_rep)}</td>
-            </tr>
-        </table>
-        <div style="margin-top: 15px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px; color: #000 !important;">
-                <thead>
-                    <tr style="background-color: #e0e0e0;">
-                        <th style="border: 1px solid #000; padding: 6px;">ID</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Data</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Solicitante / Setor</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Equipamento</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Tipo</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Prioridade</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Status</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Solução</th>
-                        <th style="border: 1px solid #000; padding: 6px;">Efetuado Por</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {linhas_os_html}
-                </tbody>
-            </table>
-        </div>
-        <table style="width: 100%; margin-top: 40px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
-            <tr>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Responsável pela Emissão</b></td>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Aprovação / Gerência</b></td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
-"""
-                    components.html(print_rel_html, height=750, scrolling=True)
 
     # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---
     elif menu == "📅 Formulários e Prazos (FMs)":
@@ -1158,7 +1064,6 @@ if menu is not None:
                     st.info("Nenhum FM cadastrado para renovar.")
                 else:
                     lista_fms_cadastrados = df_fms_existente["FM"].unique().tolist()
-                    
                     fm_escolhido = st.selectbox("Selecione o FM que foi refeito", lista_fms_cadastrados, key="select_fm_renovacao")
                     
                     row_fm_ant = df_fms_existente[df_fms_existente["FM"] == fm_escolhido]
@@ -1170,9 +1075,9 @@ if menu is not None:
                             
                     with st.form("form_renovar_fm"):
                         nova_data_realizada = st.date_input("Nova Data de Realização", value=datetime.now())
-                        novo_periodo_nome = st.selectbox("Período de Vencimento / Renovação", list(dias_dict.keys()), index=per_ant_idx)
+                        novo_periodo_nome = st.selectbox("Período de Vencimento", list(dias_dict.keys()), index=per_ant_idx)
                         
-                        btn_renovar = st.form_submit_button("🔄 Atualizar e Recalcular Vencimento", use_container_width=True)
+                        btn_renovar = st.form_submit_button("🔄 Atualizar Vencimento", use_container_width=True)
                         
                         if btn_renovar:
                             df_fms_existente.loc[df_fms_existente["FM"] == fm_escolhido, "Data_Realizada"] = str(nova_data_realizada)
@@ -1180,18 +1085,18 @@ if menu is not None:
                             df_fms_existente.loc[df_fms_existente["FM"] == fm_escolhido, "Dias_Prazo"] = str(dias_dict[novo_periodo_nome])
                             
                             df_fms_existente.to_csv(ARQUIVO_FMS, index=False)
-                            st.success(f"FM '{fm_escolhido}' atualizado com sucesso! Novo prazo recalculado.")
+                            st.success(f"FM '{fm_escolhido}' atualizado com sucesso!")
                             st.rerun()
 
         with tab_fm2:
             st.subheader("🗑️ Excluir Formulário (FM)")
             df_fms_exc = pd.read_csv(ARQUIVO_FMS, dtype=str)
             if df_fms_exc.empty:
-                st.info("Nenhum FM cadastrado para exclusão.")
+                st.info("Nenhum FM cadastrado.")
             else:
                 lista_fms_exc = sorted(df_fms_exc["FM"].unique().tolist())
                 with st.form("form_excluir_fm"):
-                    fm_para_excluir = st.selectbox("Selecione o FM que deseja excluir permanentemente", lista_fms_exc)
+                    fm_para_excluir = st.selectbox("Selecione o FM que deseja excluir", lista_fms_exc)
                     btn_conf_exc_fm = st.form_submit_button("🗑️ Excluir FM Selecionado", type="primary", use_container_width=True)
                     
                     if btn_conf_exc_fm:
@@ -1212,39 +1117,6 @@ if menu is not None:
                 df_fms['Status'] = df_fms['Dias_Restantes'].apply(lambda x: "Atrasado 🔴" if x < 0 else "No Prazo 🟢")
                 
                 st.dataframe(df_fms[["FM", "Data_Realizada", "Periodo", "Vencimento", "Dias_Restantes", "Status"]], use_container_width=True)
-                
-                df_fms['Dias_Prazo'] = df_fms['Dias_Prazo_int']
-                df_melted = df_fms.melt(
-                    id_vars=['FM', 'Data_Realizada', 'Periodo'], 
-                    value_vars=['Dias_Prazo', 'Dias_Restantes'],
-                    var_name='Métrica', 
-                    value_name='Dias'
-                )
-                df_melted['Métrica'] = df_melted['Métrica'].replace({
-                    'Dias_Prazo': 'Prazo',
-                    'Dias_Restantes': 'Dias Restantes'
-                })
-                
-                fig = px.bar(
-                    df_melted, 
-                    x='FM', 
-                    y='Dias', 
-                    color='Métrica', 
-                    barmode='group',
-                    text='Dias',
-                    title='Comparativo de Prazos e Dias Restantes por Formulário (FM)',
-                    color_discrete_map={'Prazo': '#FF7F0E', 'Dias Restantes': '#1F77B4'}
-                )
-                fig.update_traces(texttemplate='%{text}', textposition='outside')
-                fig.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)", 
-                    plot_bgcolor="rgba(0,0,0,0)", 
-                    xaxis_title="Formulário (FM)",
-                    yaxis_title="Dias"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Cadastre o primeiro formulário na aba anterior para visualizar os cálculos automáticos e gráficos.")
 
     # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---
     elif menu == "🛒 Solicitações de Compras":
@@ -1285,20 +1157,6 @@ if menu is not None:
                 df_view['Orcamento_Assinado'] = df_view['Orcamento_Assinado'].apply(formatar_orcamento)
                 df_view['Data_Apenas'] = df_view['Data_Solicitacao'].astype(str).str.split(" ").str[0]
 
-                st.markdown("""
-                    <style>
-                        .filtro-compras-box label p {
-                            font-size: 11px !important;
-                            font-weight: 600 !important;
-                            margin-bottom: -2px !important;
-                        }
-                        .filtro-compras-box div[data-baseweb="select"] {
-                            min-height: 30px !important;
-                        }
-                    </style>
-                """, unsafe_allow_html=True)
-
-                st.markdown("<div class='filtro-compras-box'>", unsafe_allow_html=True)
                 col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
                 
                 with col_f1:
@@ -1316,7 +1174,6 @@ if menu is not None:
                 with col_f5:
                     opts_status = ["Todos"] + sorted([st_v for st_v in df_view['Status_Visual'].dropna().unique() if str(st_v).strip() != ""])
                     filtro_status_v = st.selectbox("🚦 Status", opts_status, key="f_comp_status")
-                st.markdown("</div>", unsafe_allow_html=True)
 
                 if filtro_data != "Todas":
                     df_view = df_view[df_view['Data_Apenas'] == filtro_data]
@@ -1355,7 +1212,7 @@ if menu is not None:
                             if tem_anexo:
                                 st.caption(f"Atual: {os.path.basename(str(path_atual))}")
                             else:
-                                st.caption("Nenum anexo atual.")
+                                st.caption("Nenhum anexo atual.")
                             
                             col_b1, col_b2 = st.columns(2)
                             btn_anexar = col_b1.form_submit_button("💾 Salvar", use_container_width=True)
@@ -1464,20 +1321,20 @@ if menu is not None:
                                 st.success("Pedido excluído com sucesso!")
                                 st.rerun()
                 else:
-                    st.info("🔒 O gerenciamento de orçamentos, alteração de status, edição de itens e exclusão são restritos a administradores.")
+                    st.info("🔒 Gerenciamento restrito a administradores.")
 
         with tab_comp2:
             st.markdown("### Adicione os itens desejados na solicitação:")
             with st.form("form_add_item_compra", clear_on_submit=True):
                 col_i1, col_i2, col_i3 = st.columns([2, 1.5, 1])
                 with col_i1:
-                    item_input = st.text_input("Nome do Material / Item (Ex: Vassoura, Detergente) *")
+                    item_input = st.text_input("Nome do Material / Item *")
                 with col_i2:
                     cat_input = st.selectbox("Categoria", ["Material de Escritório", "Item Operacional", "Material de Limpeza"])
                 with col_i3:
                     qtd_input = st.number_input("Quantidade", min_value=1, value=1)
                     
-                btn_add_item = st.form_submit_button("➕ Adicionar Item à Lista da Solicitação", use_container_width=True)
+                btn_add_item = st.form_submit_button("➕ Adicionar Item à Lista", use_container_width=True)
                 if btn_add_item:
                     if not item_input:
                         st.error("Informe o nome do material!")
@@ -1487,7 +1344,7 @@ if menu is not None:
                             "Categoria": cat_input,
                             "Quantidade": int(qtd_input)
                         })
-                        st.success(f"Item '{item_input.upper()}' (Qtd: {qtd_input}) adicionado à lista!")
+                        st.success(f"Item '{item_input.upper()}' adicionado!")
             
             if st.session_state.carrinho_compras:
                 st.markdown("#### Itens Atuais na Solicitação:")
@@ -1543,10 +1400,8 @@ if menu is not None:
                             df_c = pd.concat([df_c, pd.DataFrame(novas_linhas)], ignore_index=True)
                             df_c.to_csv(ARQUIVO_COMPRAS, index=False)
                             st.session_state.carrinho_compras = []
-                            st.success(f"Solicitação de Compra #{novo_id_c} registrada com sucesso com todos os itens!")
+                            st.success(f"Solicitação de Compra #{novo_id_c} registrada com sucesso!")
                             st.rerun()
-            else:
-                st.info("Nenhum item adicionado à lista ainda. Preencha acima e clique em 'Adicionar Item à Lista'.")
 
         with tab_comp3:
             df_c_print = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
@@ -1705,27 +1560,58 @@ if menu is not None:
                     st.info("Nenhuma compra registrada para assinar.")
                 else:
                     ids_ass = sorted(df_ass["ID_Compra"].unique().tolist(), reverse=True)
-                    col_sel1, col_sel2 = st.columns([1, 2])
+                    
+                    # Layout do topo: Seleção do Pedido e Botão de Assinar na mesma linha/coeso
+                    col_sel1, col_sel2 = st.columns([2.5, 1])
                     
                     with col_sel1:
                         id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
                         rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
                         row_base_ass = rows_ass.iloc[0]
                     
+                    # Buscar assinatura em PNG vinculada ao usuário logado
+                    df_u_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                    row_u_logged = df_u_check[df_u_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
+                    ass_png_path = "None"
+                    if not row_u_logged.empty:
+                        ass_png_path = str(row_u_logged.iloc[0].get("Assinatura_PNG", "None"))
+                    tem_assinatura_png = (ass_png_path != "None" and os.path.exists(ass_png_path))
+
                     with col_sel2:
                         st.markdown("<br>", unsafe_allow_html=True)
-                        assinado_por_val = str(row_base_ass.get('Assinado_Por', 'None')).strip()
-                        
-                        if assinado_por_val != "None" and assinado_por_val != "":
-                            st.markdown(
-                                "**Status da Assinatura Digital:** <span style='background-color: #28a745; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🟢 Assinado</span>", 
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            st.markdown(
-                                "**Status da Assinatura Digital:** <span style='background-color: #dc3545; color: white; padding: 4px 10px; border-radius: 5px; font-weight: bold;'>🔴 Pendente de Assinatura</span>", 
-                                unsafe_allow_html=True
-                            )
+                        btn_assinar_agora = st.button("✍️ Assinar Doc", disabled=not tem_assinatura_png, use_container_width=True)
+                        if btn_assinar_agora:
+                            documentos_para_assinar = [
+                                str(row_base_ass.get("Orcamento_Assinado", "None")),
+                                str(row_base_ass.get("NF_Anexada", "None")),
+                                str(row_base_ass.get("Boleto_Anexado", "None"))
+                            ]
+                            
+                            assinaram_algo = False
+                            for doc in documentos_para_assinar:
+                                if doc != "None" and os.path.exists(doc):
+                                    res = carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario)
+                                    if res:
+                                        assinaram_algo = True
+                                        
+                            if assinaram_algo:
+                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
+                                df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
+                                st.success(f"Documentos do Pedido #{id_sel_ass} assinados digitalmente por {st.session_state.usuario}!")
+                                st.rerun()
+                            else:
+                                st.error("Nenhum documento válido encontrado/anexado para assinar.")
+
+                    # Descrição/Resumo do pedido para saber a que se refere o número do pedido
+                    itens_do_pedido_str = ", ".join([f"{r['Item']} (Qtd: {r['Quantidade']})" for _, r in rows_ass.iterrows()])
+                    solicitante_pedido = row_base_ass.get("Solicitante", "N/A")
+                    setor_pedido = row_base_ass.get("Setor", "N/A")
+                    obs_pedido = row_base_ass.get("Observacoes", "Sem observações")
+
+                    st.info(f"📋 **Descrição do Pedido #{id_sel_ass}:**\n\n"
+                            f"* **Solicitante:** {solicitante_pedido} | **Setor:** {setor_pedido}\n"
+                            f"* **Itens:** {itens_do_pedido_str}\n"
+                            f"* **Observações:** {obs_pedido}")
 
                     st.markdown("---")
                     
@@ -1763,43 +1649,8 @@ if menu is not None:
                                     st.warning("Selecione ao menos um arquivo para salvar.")
 
                     with col_acoes:
-                        st.markdown("**Ações de Assinatura e Envio**")
-                        
-                        # Buscar a assinatura em PNG vinculada ao usuário logado
-                        df_u_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                        row_u_logged = df_u_check[df_u_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                        ass_png_path = "None"
-                        if not row_u_logged.empty:
-                            ass_png_path = str(row_u_logged.iloc[0].get("Assinatura_PNG", "None"))
-                            
-                        tem_assinatura_png = (ass_png_path != "None" and os.path.exists(ass_png_path))
-                        
                         if not tem_assinatura_png:
                             st.warning("⚠️ Seu usuário não possui uma assinatura em PNG cadastrada na tela de Login.")
-                        
-                        if st.button("✍️ Assinar Documentos (Orçamento, NF e Boleto)", disabled=not tem_assinatura_png, use_container_width=True):
-                            documentos_para_assinar = [
-                                str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                str(row_base_ass.get("NF_Anexada", "None")),
-                                str(row_base_ass.get("Boleto_Anexado", "None"))
-                            ]
-                            
-                            assinaram_algo = False
-                            for doc in documentos_para_assinar:
-                                if doc != "None" and os.path.exists(doc):
-                                    res = carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario)
-                                    if res:
-                                        assinaram_algo = True
-                                        
-                            if assinaram_algo:
-                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
-                                df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success(f"Documentos do Pedido #{id_sel_ass} assinados digitalmente por {st.session_state.usuario}!")
-                                st.rerun()
-                            else:
-                                st.error("Nenhum documento válido encontrado ou anexado para assinar.")
-                                
-                        st.markdown("---")
                         
                         with st.form("form_enviar_email_docs"):
                             st.markdown("**📧 Enviar Documentos por E-mail:**")
