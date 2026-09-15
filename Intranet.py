@@ -6,6 +6,20 @@ from datetime import datetime, timedelta
 import plotly.express as px
 from PIL import Image
 import base64
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+import io
+
+# Tenta importar bibliotecas para manipulação e carimbo de PDFs
+try:
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.pdfgen import canvas
+    HAS_PDF_LIBS = True
+except ImportError:
+    HAS_PDF_LIBS = False
 
 # Cria diretórios de uploads se não existirem
 os.makedirs("uploads_orcamentos", exist_ok=True)
@@ -258,6 +272,122 @@ def exibir_documento(caminho_arquivo, titulo):
                 file_name=os.path.basename(str(caminho_arquivo)),
                 use_container_width=True
             )
+
+# --- FUNÇÃO PARA APLICAR A ASSINATURA DIGITAL NO FINAL DO DOCUMENTO ---
+def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_usuario):
+    if not os.path.exists(caminho_doc) or not os.path.exists(caminho_assinatura_png):
+        return False
+    
+    ext = os.path.splitext(caminho_doc)[1].lower()
+    
+    if ext == ".pdf" and HAS_PDF_LIBS:
+        try:
+            reader = PdfReader(caminho_doc)
+            writer = PdfWriter()
+            num_pages = len(reader.pages)
+            
+            # Pega a última página para calcular as dimensões
+            ultima_pagina = reader.pages[-1]
+            largura = float(ultima_pagina.mediabox.width)
+            altura = float(ultima_pagina.mediabox.height)
+            
+            # Cria um PDF temporário em memória contendo o carimbo da assinatura na parte inferior
+            packet = io.BytesIO()
+            can = canvas.Canvas(packet, pagesize=(largura, altura))
+            
+            # Posição da assinatura (canto inferior direito)
+            width_img = 160
+            height_img = 60
+            x = largura - width_img - 40
+            y = 40
+            
+            can.drawImage(caminho_assinatura_png, x, y, width=width_img, height=height_img, mask='auto', preserveAspectRatio=True)
+            can.setFont("Helvetica-Bold", 8)
+            can.drawString(x, y - 10, f"Assinado digitalmente por: {nome_usuario}")
+            can.drawString(x, y - 20, f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+            can.save()
+            
+            packet.seek(0)
+            overlay_pdf = PdfReader(packet)
+            overlay_page = overlay_pdf.pages[0]
+            
+            for i, page in enumerate(reader.pages):
+                if i == num_pages - 1:
+                    page.merge_page(overlay_page)
+                writer.add_page(page)
+                
+            temp_path = caminho_doc + ".signed.pdf"
+            with open(temp_path, "wb") as f_out:
+                writer.write(f_out)
+                
+            os.replace(temp_path, caminho_doc)
+            return True
+        except Exception as e:
+            st.error(f"Erro ao aplicar carimbo no PDF: {e}")
+            return False
+            
+    elif ext in [".png", ".jpg", ".jpeg"]:
+        try:
+            doc_img = Image.open(caminho_doc).convert("RGBA")
+            ass_img = Image.open(caminho_assinatura_png).convert("RGBA")
+            
+            # Redimensiona a assinatura para tamanho proporcional ao documento
+            ass_width = int(doc_img.width * 0.25)
+            w_percent = (ass_width / float(ass_img.width))
+            ass_height = int((float(ass_img.height) * float(w_percent)))
+            ass_img = ass_img.resize((ass_width, ass_height), Image.Resampling.LANCZOS)
+            
+            # Posiciona no canto inferior direito
+            pos_x = doc_img.width - ass_width - 20
+            pos_y = doc_img.height - ass_height - 20
+            
+            doc_img.paste(ass_img, (pos_x, pos_y), ass_img)
+            doc_img.convert("RGB").save(caminho_doc)
+            return True
+        except Exception as e:
+            st.error(f"Erro ao aplicar carimbo na Imagem: {e}")
+            return False
+            
+    return True
+
+# --- FUNÇÃO PARA ENVIO REAL DE E-MAIL VIA SMTP ---
+def enviar_email_real(destinatario, assunto, corpo, anexos, config):
+    try:
+        remetente = config.get("Email_Remetente", "")
+        senha_app = config.get("API_Key", "")
+        servidor_smtp = config.get("Servidor_SMTP", "smtp.gmail.com")
+        porta_smtp = int(config.get("Porta_SMTP", "587"))
+        
+        if not remetente or not senha_app:
+            return False, "E-mail remetente ou Senha/Chave API não configurados nas configurações de E-mail!"
+            
+        msg = MIMEMultipart()
+        msg['From'] = f"{config.get('Nome_Remetente', 'Intranet Stang')} <{remetente}>"
+        msg['To'] = destinatario
+        msg['Subject'] = assunto
+        
+        msg.attach(MIMEText(corpo, 'plain'))
+        
+        for file_path in anexos:
+            if file_path and str(file_path) != "None" and os.path.exists(str(file_path)):
+                with open(file_path, "rb") as attachment:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                filename = os.path.basename(file_path)
+                part.add_header("Content-Disposition", f"attachment; filename= {filename}")
+                msg.attach(part)
+                
+        server = smtplib.SMTP(servidor_smtp, porta_smtp)
+        server.starttls()
+        server.login(remetente, senha_app)
+        text = msg.as_string()
+        server.sendmail(remetente, destinatario, text)
+        server.quit()
+        
+        return True, "E-mail enviado com sucesso!"
+    except Exception as e:
+        return False, f"Falha no envio de e-mail: {str(e)}"
 
 # --- SISTEMA DE AUTENTICAÇÃO E GERENCIAMENTO NA TELA DE LOGIN ---
 if "autenticado" not in st.session_state:
@@ -1542,10 +1672,10 @@ if menu is not None:
         # ABA 4 - ASSINATURAS E ENVIOS DE E-MAIL (SOMENTE ADMIN)
         if is_user_admin:
             with tab_comp4:
-                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto) e Configurações de E-mail API")
+                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto) e Configurações de E-mail SMTP")
                 
-                # --- SUB-SEÇÃO 1: CONFIGURAÇÃO DE E-MAIL REMETENTE / API ---
-                with st.expander("⚙️ Configurações de E-mail para Envio (API / SMTP)"):
+                # --- SUB-SEÇÃO 1: CONFIGURAÇÃO DE E-MAIL REMETENTE / SMTP ---
+                with st.expander("⚙️ Configurações de E-mail para Envio Real (SMTP / Gmail / Outlook)"):
                     df_email_cfg = pd.read_csv(ARQUIVO_CONFIG_EMAIL, dtype=str)
                     cfg_row = df_email_cfg.iloc[0] if not df_email_cfg.empty else {}
                     
@@ -1553,11 +1683,12 @@ if menu is not None:
                         st.markdown("**Cadastrar / Configurar Conta Remetente:**")
                         c_e1, c_e2 = st.columns(2)
                         with c_e1:
-                            remetente_email = st.text_input("E-mail Remetente (Envio)", value=str(cfg_row.get("Email_Remetente", "compras@stang.com.br")))
+                            remetente_email = st.text_input("E-mail Remetente", value=str(cfg_row.get("Email_Remetente", "compras@stang.com.br")))
                             remetente_nome = st.text_input("Nome do Remetente", value=str(cfg_row.get("Nome_Remetente", "Intranet Stang Compras")))
                         with c_e2:
-                            api_key_str = st.text_input("Chave API / Senha de App", value=str(cfg_row.get("API_Key", "")), type="password")
-                            servidor_smtp = st.text_input("Servidor SMTP / API Host", value=str(cfg_row.get("Servidor_SMTP", "smtp.gmail.com")))
+                            api_key_str = st.text_input("Senha de App / Token SMTP", value=str(cfg_row.get("API_Key", "")), type="password")
+                            servidor_smtp = st.text_input("Servidor SMTP Host", value=str(cfg_row.get("Servidor_SMTP", "smtp.gmail.com")))
+                            porta_smtp_in = st.text_input("Porta SMTP", value=str(cfg_row.get("Porta_SMTP", "587")))
                             
                         btn_salvar_email_cfg = st.form_submit_button("💾 Salvar Configurações de E-mail")
                         if btn_salvar_email_cfg:
@@ -1566,10 +1697,10 @@ if menu is not None:
                                 "Nome_Remetente": remetente_nome,
                                 "API_Key": api_key_str,
                                 "Servidor_SMTP": servidor_smtp,
-                                "Porta_SMTP": "587"
+                                "Porta_SMTP": porta_smtp_in
                             }])
                             nova_cfg.to_csv(ARQUIVO_CONFIG_EMAIL, index=False)
-                            st.success("Configurações de E-mail API salvas com sucesso!")
+                            st.success("Configurações de E-mail salvas com sucesso!")
                             st.rerun()
 
                 st.markdown("---")
@@ -1633,193 +1764,132 @@ if menu is not None:
                                     st.rerun()
 
                     with col_acoes:
-                        st.markdown("**Ações de Assinatura e Envio**")
+                        st.markdown("**✍️ Selecionar e Carimbar Assinatura Digital**")
                         
-                        if st.button("✍️ Assinar Digitalmente (NF e Boleto)", use_container_width=True):
-                            if row_base_ass.get("NF_Anexada", "None") != "None" and row_base_ass.get("Boleto_Anexado", "None") != "None":
+                        df_u_ass = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                        row_u_logado = df_u_ass[df_u_ass["Usuario"].str.lower() == st.session_state.usuario.lower()]
+                        
+                        ass_cadastrada_path = "None"
+                        if not row_u_logado.empty:
+                            ass_cadastrada_path = str(row_u_logado.iloc[0].get("Assinatura_PNG", "None"))
+                            
+                        ass_valida = (ass_cadastrada_path != "None" and os.path.exists(ass_cadastrada_path))
+                        
+                        if ass_valida:
+                            st.caption(f"Assinatura digital cadastrada para **{st.session_state.usuario}** carregada com sucesso:")
+                            st.image(ass_cadastrada_path, width=180)
+                        else:
+                            st.warning("⚠️ Nenhuma assinatura em PNG cadastrada para o seu usuário. Faça o upload temporário abaixo:")
+                            up_ass_temp = st.file_uploader("Upload Temporário da Assinatura PNG", type=["png"], key="temp_png_ass")
+                            if up_ass_temp is not None:
+                                ass_cadastrada_path = os.path.join("uploads_assinaturas", f"temp_{st.session_state.usuario}.png")
+                                with open(ass_cadastrada_path, "wb") as f:
+                                    f.write(up_ass_temp.getbuffer())
+                                ass_valida = True
+                                
+                        if st.button("✍️ Carimbar e Assinar Documentos (NF / Boleto / Orçamento)", use_container_width=True):
+                            nf_path = str(row_base_ass.get("NF_Anexada", "None"))
+                            bol_path = str(row_base_ass.get("Boleto_Anexado", "None"))
+                            orc_path = str(row_base_ass.get("Orcamento_Assinado", "None"))
+                            
+                            tem_docs = (nf_path != "None" and os.path.exists(nf_path)) or (bol_path != "None" and os.path.exists(bol_path)) or (orc_path != "None" and os.path.exists(orc_path))
+                            
+                            if not tem_docs:
+                                st.error("Faça o upload do Orçamento, Nota Fiscal ou Boleto antes de assinar.")
+                            elif not ass_valida:
+                                st.error("É necessário possuir uma assinatura PNG para carimbar o documento.")
+                            else:
+                                erro_carimbo = False
+                                # Aplica a assinatura no final de cada documento existente no pedido
+                                for p_doc in [nf_path, bol_path, orc_path]:
+                                    if p_doc != "None" and os.path.exists(p_doc):
+                                        res = carimbar_assinatura_no_documento(p_doc, ass_cadastrada_path, st.session_state.usuario)
+                                        if not res:
+                                            erro_carimbo = True
+
                                 df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
                                 df_to_save = df_ass.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
                                 df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success(f"Documentos assinados digitalmente por: {st.session_state.usuario}! Status atualizado para verde 🟢.")
+                                
+                                if not erro_carimbo:
+                                    st.success(f"Documentos assinados e carimbados com sucesso por: {st.session_state.usuario}! Status atualizado para 🟢.")
+                                else:
+                                    st.warning(f"Documentos marcados como assinados por {st.session_state.usuario}, mas alguns anexos não puderam ser carimbados visualmente.")
                                 st.rerun()
-                            else:
-                                st.error("Você precisa fazer o upload da Nota Fiscal e do Boleto antes de assinar.")
                                 
                         st.markdown("<br>", unsafe_allow_html=True)
                         
                         df_email_cfg_cur = pd.read_csv(ARQUIVO_CONFIG_EMAIL, dtype=str)
-                        remetente_cadastrado = df_email_cfg_cur.iloc[0].get("Email_Remetente", "compras@stang.com.br") if not df_email_cfg_cur.empty else "compras@stang.com.br"
+                        cfg_email_dict = df_email_cfg_cur.iloc[0].to_dict() if not df_email_cfg_cur.empty else {}
+                        remetente_cadastrado = cfg_email_dict.get("Email_Remetente", "compras@stang.com.br")
                         
                         with st.form("form_email_ass"):
-                            st.markdown(f"**Enviar Documentos (Orçamento, NF e Boleto)**")
-                            st.caption(f"E-mail Remetente Configurado (API): **{remetente_cadastrado}**")
-                            email_dest = st.text_input("E-mail de Destino")
-                            obs_email = st.text_area("Observação para anexar ao E-mail")
+                            st.markdown("**📧 Envio do Pedido por E-mail (Real / SMTP)**")
+                            st.caption(f"Remetente: **{remetente_cadastrado}**")
+                            email_dest = st.text_input("E-mail de Destino *")
+                            obs_email = st.text_area("Observação / Mensagem do E-mail")
                             
-                            if st.form_submit_button("📧 Enviar por E-mail", use_container_width=True):
+                            if st.form_submit_button("📧 Enviar por E-mail Agora", use_container_width=True):
                                 if not email_dest:
                                     st.error("Preencha o e-mail de destino.")
                                 elif str(row_base_ass.get("Assinado_Por", "None")) == "None":
-                                    st.error("Os documentos precisam ser assinados digitalmente antes de serem enviados!")
+                                    st.error("Os documentos precisam ser assinados digitalmente antes do envio.")
                                 else:
-                                    st.success(f"E-mail disparado de '{remetente_cadastrado}' para '{email_dest}' contendo o orçamento, NF e Boleto assinados com sucesso!")
+                                    lista_anexos_envio = []
+                                    for key_doc in ["Orcamento_Assinado", "NF_Anexada", "Boleto_Anexado"]:
+                                        p_f = str(row_base_ass.get(key_doc, "None"))
+                                        if p_f != "None" and os.path.exists(p_f):
+                                            lista_anexos_envio.append(p_f)
+                                            
+                                    assunto_e = f"Solicitação de Compra #{id_sel_ass} - Documentos Assinados"
+                                    corpo_e = f"Olá,\n\nSegue em anexo a documentação referente à Solicitação de Compra #{id_sel_ass}.\n\n"
+                                    corpo_e += f"Solicitante: {row_base_ass.get('Solicitante', '')}\nSetor: {row_base_ass.get('Setor', '')}\n"
+                                    corpo_e += f"Assinado digitalmente por: {row_base_ass.get('Assinado_Por', '')}\n\n"
+                                    if obs_email:
+                                        corpo_e += f"Observações:\n{obs_email}\n\n"
+                                    corpo_e += "Atenciosamente,\nIntranet Stang"
+                                    
+                                    sucesso_e, msg_e = enviar_email_real(email_dest, assunto_e, corpo_e, lista_anexos_envio, cfg_email_dict)
+                                    
+                                    if sucesso_e:
+                                        st.success(msg_e)
+                                    else:
+                                        st.error(msg_e)
 
-                    # --- SUB-SEÇÃO 3: CENTRAL DE VISUALIZAÇÃO DOS 3 DOCUMENTOS (ORÇAMENTO, NF E BOLETO) ---
-                    st.markdown("---")
-                    with st.expander("👁️ Visualizar Documentos Assinados (Orçamento, NF e Boleto)", expanded=True):
-                        st.markdown(f"### Visualização Completa do Pedido #{id_sel_ass}")
-                        col_doc1, col_doc2, col_doc3 = st.columns(3)
-                        
-                        with col_doc1:
-                            exibir_documento(row_base_ass.get("Orcamento_Assinado", "None"), "1. Orçamento")
-                        with col_doc2:
-                            exibir_documento(row_base_ass.get("NF_Anexada", "None"), "2. Nota Fiscal (NF)")
-                        with col_doc3:
-                            exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "3. Boleto")
-
-    # --- TELA 6: DASHBOARD (O.S. & COMPRAS) ---
+    # --- TELA 6: DASHBOARD ---
     elif menu == "📊 Dashboard":
-        st.markdown("# 📊 Dashboard")
-        st.markdown("Visão analítica de Ordens de Serviço e Compras. Utilize os filtros abaixo para segmentar os dados.")
+        st.markdown("# 📊 Painel Geral de Indicadores (Dashboard)")
         
-        df_os = carregar_banco_os()
-        df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+        df_os_dash = carregar_banco_os()
+        df_compras_dash = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+        df_fms_dash = pd.read_csv(ARQUIVO_FMS, dtype=str)
         
-        if not df_os.empty:
-            df_os['Dt_Parsed'] = pd.to_datetime(df_os['Data_Criacao'].str.split(" ").str[0], format='%d/%m/%Y', errors='coerce')
-            if df_os['Dt_Parsed'].isna().all():
-                df_os['Dt_Parsed'] = pd.to_datetime(df_os['Data_Criacao'], errors='coerce')
-            df_os['Ano'] = df_os['Dt_Parsed'].dt.year.fillna(0).astype(int).astype(str)
-            df_os['Mes'] = df_os['Dt_Parsed'].dt.month.fillna(0).astype(int).astype(str).str.zfill(2)
-            df_os['Dia'] = df_os['Dt_Parsed'].dt.day.fillna(0).astype(int).astype(str).str.zfill(2)
-        
-        if not df_c.empty:
-            df_c['Dt_Parsed'] = pd.to_datetime(df_c['Data_Solicitacao'], errors='coerce')
-            df_c['Ano'] = df_c['Dt_Parsed'].dt.year.fillna(0).astype(int).astype(str)
-            df_c['Mes'] = df_c['Dt_Parsed'].dt.month.fillna(0).astype(int).astype(str).str.zfill(2)
-            df_c['Dia'] = df_c['Dt_Parsed'].dt.day.fillna(0).astype(int).astype(str).str.zfill(2)
-            df_c['Quantidade'] = pd.to_numeric(df_c['Quantidade'], errors='coerce').fillna(0)
-
-        anos_opts, meses_opts, dias_opts = set(), set(), set()
-        for df_temp in [df_os, df_c]:
-            if not df_temp.empty:
-                anos_opts.update(df_temp['Ano'].unique())
-                meses_opts.update(df_temp['Mes'].unique())
-                dias_opts.update(df_temp['Dia'].unique())
-                
-        anos_opts = sorted([a for a in anos_opts if a != '0'])
-        meses_opts = sorted([m for m in meses_opts if m != '00'])
-        dias_opts = sorted([d for d in dias_opts if d != '00'])
-
-        st.markdown("### 🔍 Filtros")
-        col_f1, col_f2, col_f3 = st.columns(3)
-        with col_f1:
-            filtro_anos = st.multiselect("Filtrar por Ano", options=anos_opts, default=[], placeholder="Todos os anos")
-        with col_f2:
-            filtro_meses = st.multiselect("Filtrar por Mês", options=meses_opts, default=[], placeholder="Todos os meses")
-        with col_f3:
-            filtro_dias = st.multiselect("Filtrar por Dia", options=dias_opts, default=[], placeholder="Todos os dias")
-
-        def aplicar_filtros(df):
-            if df.empty: return df
-            df_f = df.copy()
-            if filtro_anos: df_f = df_f[df_f['Ano'].isin(filtro_anos)]
-            if filtro_meses: df_f = df_f[df_f['Mes'].isin(filtro_meses)]
-            if filtro_dias: df_f = df_f[df_f['Dia'].isin(filtro_dias)]
-            return df_f
-
-        df_os_filtrado = aplicar_filtros(df_os) if not df_os.empty else pd.DataFrame()
-        df_c_filtrado = aplicar_filtros(df_c) if not df_c.empty else pd.DataFrame()
-
-        layout_cfg = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        with col_m1:
+            st.metric("Total de O.S.", len(df_os_dash))
+        with col_m2:
+            os_abertas = len(df_os_dash[df_os_dash["Status"] != "Finalizada"]) if not df_os_dash.empty else 0
+            st.metric("O.S. Em Aberto", os_abertas)
+        with col_m3:
+            st.metric("Solicitações de Compra", len(df_compras_dash["ID_Compra"].unique()) if not df_compras_dash.empty else 0)
+        with col_m4:
+            st.metric("Formulários (FMs)", len(df_fms_dash) if not df_fms_dash.empty else 0)
+            
         st.markdown("---")
         
-        tab_dashboard_os, tab_dashboard_compras = st.tabs(["🔧 Análise de O.S.", "🛒 Análise de Compras"])
-
-        with tab_dashboard_os:
-            if df_os_filtrado.empty:
-                st.warning("Nenhuma O.S. encontrada para o período filtrado.")
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            if not df_os_dash.empty:
+                fig_os = px.pie(df_os_dash, names="Status", title="Distribuição de O.S. por Status", hole=0.4)
+                fig_os.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                st.plotly_chart(fig_os, use_container_width=True)
             else:
-                kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-                total_os = len(df_os_filtrado)
-                os_finalizadas = len(df_os_filtrado[df_os_filtrado['Status'] == 'Finalizada'])
-                os_abertas = len(df_os_filtrado[df_os_filtrado['Status'].isin(['Em Aberto', 'Em Andamento'])])
-                taxa_resolucao = (os_finalizadas / total_os * 100) if total_os > 0 else 0
+                st.info("Sem dados de O.S. para exibir gráfico.")
                 
-                kpi1.metric(label="Total de O.S. 📌", value=total_os)
-                kpi2.metric(label="O.S. Finalizadas ✅", value=os_finalizadas)
-                kpi3.metric(label="O.S. Pendentes ⏳", value=os_abertas)
-                kpi4.metric(label="Taxa de Resolução 🎯", value=f"{taxa_resolucao:.1f}%")
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                
-                g_os_1, g_os_2 = st.columns(2)
-                
-                with g_os_1:
-                    fig_os_status = px.pie(df_os_filtrado, names='Status', title="Distribuição por Status", hole=0.4, 
-                                           color='Status', color_discrete_map={'Finalizada':'#00cc96', 'Em Andamento':'#ffa15a', 'Em Aberto':'#ef553b'})
-                    fig_os_status.update_layout(**layout_cfg)
-                    st.plotly_chart(fig_os_status, use_container_width=True)
-                    
-                with g_os_2:
-                    os_setor = df_os_filtrado['Setor'].value_counts().reset_index()
-                    os_setor.columns = ['Setor', 'Quantidade']
-                    fig_os_setor = px.bar(os_setor, x='Setor', y='Quantidade', title="Volume de O.S. por Setor", text='Quantidade', color='Setor')
-                    fig_os_setor.update_layout(**layout_cfg, showlegend=False)
-                    st.plotly_chart(fig_os_setor, use_container_width=True)
-
-                g_os_3, g_os_4 = st.columns(2)
-                with g_os_3:
-                    fig_os_tipo = px.histogram(df_os_filtrado, x='Tipo_Manutencao', title="Tipo de Manutenção", color='Tipo_Manutencao', text_auto=True)
-                    fig_os_tipo.update_layout(**layout_cfg, bargap=0.2)
-                    st.plotly_chart(fig_os_tipo, use_container_width=True)
-                    
-                with g_os_4:
-                    fig_os_prio = px.funnel(df_os_filtrado.groupby('Prioridade').size().reset_index(name='Contagem'), 
-                                            x='Contagem', y='Prioridade', title="Funil de Prioridades")
-                    fig_os_prio.update_layout(**layout_cfg)
-                    st.plotly_chart(fig_os_prio, use_container_width=True)
-
-        with tab_dashboard_compras:
-            if df_c_filtrado.empty:
-                st.warning("Nenhuma Solicitação de Compra encontrada para o período filtrado.")
+        with col_g2:
+            if not df_compras_dash.empty:
+                fig_comp = px.histogram(df_compras_dash, x="Categoria", title="Solicitações de Compras por Categoria", color="Status")
+                fig_comp.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                st.plotly_chart(fig_comp, use_container_width=True)
             else:
-                kpi_c1, kpi_c2, kpi_c3, kpi_c4 = st.columns(4)
-                total_pedidos = df_c_filtrado["ID_Compra"].nunique()
-                total_itens = df_c_filtrado["Quantidade"].sum()
-                pedidos_abertos = df_c_filtrado[df_c_filtrado["Status"] == "Compra em Aberta"]["ID_Compra"].nunique()
-                pedidos_realizados = df_c_filtrado[df_c_filtrado["Status"] == "Compra Realizada"]["ID_Compra"].nunique()
-                
-                kpi_c1.metric(label="Total de Pedidos 📦", value=total_pedidos)
-                kpi_c2.metric(label="Unid. de Itens Solicitados 🔢", value=int(total_itens))
-                kpi_c3.metric(label="Pedidos em Aberto 🟠", value=pedidos_abertos)
-                kpi_c4.metric(label="Pedidos Realizados 🟢", value=pedidos_realizados)
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                
-                g_c_1, g_c_2 = st.columns(2)
-                with g_c_1:
-                    fig_c_status = px.pie(
-                        df_c_filtrado, 
-                        names='Status', 
-                        title="Distribuição de Pedidos por Status", 
-                        hole=0.4,
-                        color='Status',
-                        color_discrete_map={'Compra Realizada':'#00cc96', 'Compra em Aberta':'#ffa15a', 'Compra Recusada':'#ef553b'}
-                    )
-                    fig_c_status.update_layout(**layout_cfg)
-                    st.plotly_chart(fig_c_status, use_container_width=True)
-                    
-                with g_c_2:
-                    c_cat = df_c_filtrado.groupby('Categoria')['Quantidade'].sum().reset_index()
-                    fig_c_cat = px.bar(
-                        c_cat, 
-                        x='Categoria', 
-                        y='Quantidade', 
-                        title="Quantidade de Itens por Categoria", 
-                        text='Quantidade',
-                        color='Categoria'
-                    )
-                    fig_c_cat.update_layout(**layout_cfg, showlegend=False)
-                    st.plotly_chart(fig_c_cat, use_container_width=True)
+                st.info("Sem dados de Compras para exibir gráfico.")
