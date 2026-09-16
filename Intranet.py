@@ -14,10 +14,14 @@ from email.mime.base import MIMEBase
 from email import encoders
 import io
 
-# Tenta importar bibliotecas para manipulação e carimbo de PDFs
+# Tenta importar bibliotecas para manipulação, carimbo e geração de PDFs
 try:
     from pypdf import PdfReader, PdfWriter
     from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     HAS_PDF_LIBS = True
 except ImportError:
     HAS_PDF_LIBS = False
@@ -55,6 +59,7 @@ TODOS_MENUS = [
     "📝 Nova O.S.", 
     "📋 Gerenciar O.S.", 
     "🖨️ Imprimir O.S.", 
+    "📧 Enviar Ordens de Serviço por E-mail",
     "📅 Formulários e Prazos (FMs)",
     "🛒 Solicitações de Compras",
     "📊 Dashboard"
@@ -276,6 +281,151 @@ def carregar_banco_os():
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
 
+# Função para gerar o PDF da O.S. em memória usando ReportLab
+def gerar_pdf_os_bytes(row_os):
+    if not HAS_PDF_LIBS:
+        return None
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    
+    styles = getSampleStyleSheet()
+    normal_style = styles['Normal']
+    normal_style.fontSize = 9
+    normal_style.leading = 11
+    
+    title_style = ParagraphStyle(
+        'HeaderTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=14,
+        alignment=1
+    )
+    
+    section_style = ParagraphStyle(
+        'SectionTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=11,
+        alignment=1,
+        textColor=colors.black
+    )
+    
+    elements = []
+    
+    logo_img = ""
+    if os.path.exists("logo.png"):
+        try:
+            logo_img = RLImage("logo.png", width=120, height=40)
+        except:
+            logo_img = Paragraph("<b>STANG</b>", normal_style)
+    else:
+        logo_img = Paragraph("<b>STANG</b>", normal_style)
+        
+    header_data = [
+        [logo_img, Paragraph("<b>Solicitação de Manutenção - Ordem de Serviço</b>", title_style), Paragraph("<b>FM 12</b><br/>Revisão: 02/2024", normal_style)]
+    ]
+    t_header = Table(header_data, colWidths=[130, 280, 130])
+    t_header.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (0,0), (0,0), 'CENTER'),
+        ('ALIGN', (2,2), (2,2), 'RIGHT'),
+    ]))
+    elements.append(t_header)
+    elements.append(Spacer(1, 5))
+    
+    data_criacao_val = str(row_os.get('Data_Criacao', ''))
+    dt_p = data_criacao_val.split(' ')[0] if ' ' in data_criacao_val else data_criacao_val
+    hr_p = data_criacao_val.split(' ')[1] if len(data_criacao_val.split(' ')) > 1 else '17:00'
+    
+    info_data = [
+        [Paragraph(f"<b>Número:</b> {row_os.get('ID', '')}", normal_style),
+         Paragraph(f"<b>Data:</b> {dt_p}", normal_style),
+         Paragraph(f"<b>Hora:</b> {hr_p}", normal_style)]
+    ]
+    t_info = Table(info_data, colWidths=[180, 180, 180])
+    t_info.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(t_info)
+    elements.append(Spacer(1, 5))
+    
+    prio_data = [
+        [Paragraph("<b>Tipo de Manutenção</b>", section_style), Paragraph("<b>Prioridade de Manutenção</b>", section_style)],
+        [Paragraph(f"<b>{row_os.get('Tipo_Manutencao', '')}</b>", title_style), Paragraph(f"<b>{row_os.get('Prioridade', '')}</b>", title_style)]
+    ]
+    t_prio = Table(prio_data, colWidths=[270, 270])
+    t_prio.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('BACKGROUND', (0,0), (1,0), colors.HexColor('#E0E0E0')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(t_prio)
+    elements.append(Spacer(1, 5))
+    
+    det_data = [
+        [Paragraph(f"<b>SETOR:</b> {row_os.get('Setor', '')}", normal_style), Paragraph(f"<b>SOLICITANTE:</b> {row_os.get('Solicitante', '')}", normal_style)],
+        [Paragraph(f"<b>Equipamento:</b> {row_os.get('Equipamento', '')}", normal_style), Paragraph(f"<b>Status:</b> {row_os.get('Status', '')}", normal_style)]
+    ]
+    t_det = Table(det_data, colWidths=[270, 270])
+    t_det.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(t_det)
+    elements.append(Spacer(1, 5))
+    
+    def criar_bloco_texto(titulo, texto):
+        return Table([
+            [Paragraph(f"<b>{titulo}</b>", section_style)],
+            [Paragraph(str(texto) if pd.notna(texto) else "", normal_style)]
+        ], colWidths=[540], style=[
+            ('BOX', (0,0), (-1,-1), 1, colors.black),
+            ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#E0E0E0')),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ])
+
+    elements.append(criar_bloco_texto("Descrição do Problema", row_os.get("Descricao", "")))
+    elements.append(Spacer(1, 5))
+    elements.append(criar_bloco_texto("Descrição da Solução", row_os.get("Solucao", "")))
+    elements.append(Spacer(1, 5))
+    elements.append(criar_bloco_texto("Itens Trocados", row_os.get("Itens_Trocados", "")))
+    elements.append(Spacer(1, 30))
+    
+    finalizador = row_os.get('finalizado_por', '')
+    finalizador_str = f" ({finalizador})" if finalizador else ""
+    
+    ass_data = [
+        [Paragraph("__________________________________________<br/><b>Manutenção</b>", title_style),
+         Paragraph(f"__________________________________________<br/><b>Responsável pelo Serviço{finalizador_str}</b>", title_style)]
+    ]
+    t_ass = Table(ass_data, colWidths=[270, 270])
+    t_ass.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(t_ass)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
+
 # Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64)
 def exibir_documento(caminho_arquivo, titulo):
     if pd.isna(caminho_arquivo) or str(caminho_arquivo).strip() in ["None", ""]:
@@ -318,98 +468,6 @@ def exibir_documento(caminho_arquivo, titulo):
                 file_name=os.path.basename(str(caminho_arquivo)),
                 use_container_width=True
             )
-
-# --- FUNÇÃO PARA GERAR O HTML COMPLETO DA OS DA IMPRESSÃO ---
-def gerar_html_os_impressao(os_row):
-    equipamento_val = os_row['Equipamento'] if pd.notna(os_row.get('Equipamento')) else 'N/A'
-    solucao_val = os_row['Solucao'] if pd.notna(os_row.get('Solucao')) else ''
-    itens_val = os_row['Itens_Trocados'] if pd.notna(os_row.get('Itens_Trocados')) else ''
-    finalizador_val = os_row['finalizado_por'] if pd.notna(os_row.get('finalizado_por')) else ''
-    data_criacao_val = str(os_row['Data_Criacao'])
-    
-    logo_base64 = ""
-    if os.path.exists("logo.png"):
-        with open("logo.png", "rb") as img_file:
-            logo_base64 = base64.b64encode(img_file.read()).decode()
-
-    return f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
-        .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
-        .btn-imprimir {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-        @media print {{ .print-btn-container {{ display: none !important; }} body {{ padding: 0; }} }}
-    </style>
-</head>
-<body>
-    <div class="print-btn-container">
-        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir O.S.</button>
-    </div>
-    <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
-            <tr>
-                <td style="width: 28%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
-                    <img src="data:image/png;base64,{logo_base64}" style="max-height: 45px; max-width: 100%;">
-                </td>
-                <td style="width: 44%; border: 1px solid #000; text-align: center; vertical-align: middle;">
-                    <h3 style="margin: 0; color: #000 !important; font-size: 15px;">Solicitação de Manutenção - Ordem de Serviço</h3>
-                </td>
-                <td style="width: 28%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
-                    <b>FM 12</b><br>Revisão: 02/2024
-                </td>
-            </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Número:</b> {os_row['ID']}</td>
-                <td style="border: 1px solid #000; padding: 5px; width: 34%;"><b>Data:</b> {data_criacao_val.split(' ')[0]}</td>
-                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Hora:</b> {data_criacao_val.split(' ')[1] if len(data_criacao_val.split(' ')) > 1 else '17:00'}</td>
-            </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; text-align: center; color: #000 !important;">
-            <tr>
-                <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Tipo de Manutenção</b></td>
-                <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Prioridade de Manutenção</b></td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{os_row['Tipo_Manutencao']}</td>
-                <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{os_row['Prioridade']}</td>
-            </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SETOR:</b> {os_row['Setor']}</td>
-                <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SOLICITANTE:</b> {os_row['Solicitante']}</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px;" colspan="2"><b>Equipamento:</b> {equipamento_val}</td>
-            </tr>
-        </table>
-        <div style="border: 1px solid #000; border-top: none;">
-            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição do Problema</div>
-            <div style="padding: 10px; min-height: 70px; font-size: 13px; color: #000 !important;">{os_row['Descricao']}</div>
-        </div>
-        <div style="border: 1px solid #000; border-top: none;">
-            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição da Solução</div>
-            <div style="padding: 10px; min-height: 50px; font-size: 13px; color: #000 !important;">{solucao_val}</div>
-        </div>
-        <div style="border: 1px solid #000; border-top: none;">
-            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Itens Trocados</div>
-            <div style="padding: 10px; min-height: 40px; font-size: 13px; color: #000 !important;">{itens_val}</div>
-        </div>
-        <table style="width: 100%; margin-top: 35px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
-            <tr>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Manutenção</b></td>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Responsável pelo Serviço ({finalizador_val})</b></td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
-"""
 
 # --- FUNÇÃO PARA APLICAR A ASSINATURA DIGITAL NO FINAL DO DOCUMENTO ---
 def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_usuario):
@@ -502,22 +560,25 @@ def enviar_email_real(destinatario, assunto, corpo, anexos, config):
         
         msg.attach(MIMEText(corpo, 'plain'))
         
-        for file_item in anexos:
-            if isinstance(file_item, tuple):
-                file_bytes, filename = file_item
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(file_bytes)
-                encoders.encode_base64(part)
-                part.add_header("Content-Disposition", f"attachment; filename= {filename}")
-                msg.attach(part)
-            elif file_item and str(file_item) != "None" and os.path.exists(str(file_item)):
-                with open(file_item, "rb") as attachment:
-                    part = MIMEBase("application", "octet-stream")
-                    part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                filename = os.path.basename(file_item)
-                part.add_header("Content-Disposition", f"attachment; filename= {filename}")
-                msg.attach(part)
+        for item in anexos:
+            if isinstance(item, tuple):
+                filename, file_bytes = item
+                if file_bytes:
+                    part = MIMEBase("application", "pdf")
+                    part.set_payload(file_bytes)
+                    encoders.encode_base64(part)
+                    part.add_header("Content-Disposition", f"attachment; filename= {filename}")
+                    msg.attach(part)
+            else:
+                file_path = item
+                if file_path and str(file_path) != "None" and os.path.exists(str(file_path)):
+                    with open(file_path, "rb") as attachment:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(attachment.read())
+                    encoders.encode_base64(part)
+                    filename = os.path.basename(file_path)
+                    part.add_header("Content-Disposition", f"attachment; filename= {filename}")
+                    msg.attach(part)
                 
         server = smtplib.SMTP(servidor_smtp, porta_smtp)
         server.starttls()
@@ -888,275 +949,148 @@ if menu is not None:
         if df.empty:
             st.info("Nenhuma O.S. registrada no momento.")
         else:
-            aba_os_manag1, aba_os_manag2 = st.tabs(["📋 Gerenciar O.S.", "📧 Enviar O.S. por E-mail"])
+            dias_prioridade_map = {"URGENTE": 1, "ALTA": 5, "MÉDIA": 15, "MEDIA": 15, "BAIXA": 30}
             
-            # --- ABA 1: GERENCIAR O.S. ---
-            with aba_os_manag1:
-                dias_prioridade_map = {"URGENTE": 1, "ALTA": 5, "MÉDIA": 15, "MEDIA": 15, "BAIXA": 30}
-                
-                def calcular_vencimento_os(row):
-                    try:
-                        prio = str(row['Prioridade']).upper()
-                        dias = dias_prioridade_map.get(prio, 30)
-                        dt_criacao = pd.to_datetime(str(row['Data_Criacao']).split(" ")[0], format='%d/%m/%Y', errors='coerce')
-                        if pd.isna(dt_criacao):
-                            dt_criacao = pd.to_datetime(str(row['Data_Criacao']), errors='coerce')
-                        if pd.isna(dt_criacao):
-                            return datetime.now().date()
-                        return (dt_criacao + timedelta(days=dias)).date()
-                    except:
+            def calcular_vencimento_os(row):
+                try:
+                    prio = str(row['Prioridade']).upper()
+                    dias = dias_prioridade_map.get(prio, 30)
+                    dt_criacao = pd.to_datetime(str(row['Data_Criacao']).split(" ")[0], format='%d/%m/%Y', errors='coerce')
+                    if pd.isna(dt_criacao):
+                        dt_criacao = pd.to_datetime(str(row['Data_Criacao']), errors='coerce')
+                    if pd.isna(dt_criacao):
                         return datetime.now().date()
+                    return (dt_criacao + timedelta(days=dias)).date()
+                except:
+                    return datetime.now().date()
 
-                def determinar_status_prazo(row):
-                    status_atual = str(row['Status']).lower()
-                    if "finalizada" in status_atual or "concluída" in status_atual:
-                        return "Finalizada 🔵"
-                    venc = row['Prazo_Limite']
-                    hoje = datetime.now().date()
-                    if hoje > venc:
-                        return "Vencida 🔴"
-                    else:
-                        return "No Prazo 🟢"
+            def determinar_status_prazo(row):
+                status_atual = str(row['Status']).lower()
+                if "finalizada" in status_atual or "concluída" in status_atual:
+                    return "Finalizada 🔵"
+                venc = row['Prazo_Limite']
+                hoje = datetime.now().date()
+                if hoje > venc:
+                    return "Vencida 🔴"
+                else:
+                    return "No Prazo 🟢"
 
-                df['Prazo_Limite'] = df.apply(calcular_vencimento_os, axis=1)
-                df['Status_Prazo'] = df.apply(determinar_status_prazo, axis=1)
+            df['Prazo_Limite'] = df.apply(calcular_vencimento_os, axis=1)
+            df['Status_Prazo'] = df.apply(determinar_status_prazo, axis=1)
 
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    filtro_status = st.selectbox("Filtrar por Status", ["Todos"] + list(df["Status"].unique()))
-                with c2:
-                    filtro_setor = st.selectbox("Filtrar por Setor", ["Todos"] + list(df["Setor"].unique()))
-                with c3:
-                    lista_finalizado_por_opts = ["Todos"] + sorted([x for x in df["finalizado_por"].dropna().unique().tolist() if str(x).strip() != ""])
-                    filtro_finalizador = st.selectbox("Filtrar por Executante", lista_finalizado_por_opts)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                filtro_status = st.selectbox("Filtrar por Status", ["Todos"] + list(df["Status"].unique()))
+            with c2:
+                filtro_setor = st.selectbox("Filtrar por Setor", ["Todos"] + list(df["Setor"].unique()))
+            with c3:
+                lista_finalizado_por_opts = ["Todos"] + sorted([x for x in df["finalizado_por"].dropna().unique().tolist() if str(x).strip() != ""])
+                filtro_finalizador = st.selectbox("Filtrar por Executante", lista_finalizado_por_opts)
+                
+            df_filtered = df.copy()
+            if filtro_status != "Todos":
+                df_filtered = df_filtered[df_filtered["Status"] == filtro_status]
+            if filtro_setor != "Todos":
+                df_filtered = df_filtered[df_filtered["Setor"] == filtro_setor]
+            if filtro_finalizador != "Todos":
+                df_filtered = df_filtered[df_filtered["finalizado_por"] == filtro_finalizador]
+                
+            cols_exibicao = ["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Prazo_Limite", "Status_Prazo", "Status", "Equipamento", "Solucao", "Itens_Trocados", "finalizado_por"]
+            st.dataframe(df_filtered[cols_exibicao].sort_values(by="ID", ascending=False), use_container_width=True)
+            
+            st.markdown("---")
+            
+            aba_os_ges1, aba_os_ges2 = st.tabs(["✏️ Editar / Finalizar O.S.", "🗑️ Excluir O.S."])
+            
+            with aba_os_ges1:
+                ids_os_lista = sorted(df["ID"].tolist(), reverse=True)
+                if ids_os_lista:
+                    os_selecionada_id = st.selectbox("Selecione o ID da O.S.", ids_os_lista)
+                    row_edit_os = df[df["ID"] == os_selecionada_id].iloc[0]
                     
-                df_filtered = df.copy()
-                if filtro_status != "Todos":
-                    df_filtered = df_filtered[df_filtered["Status"] == filtro_status]
-                if filtro_setor != "Todos":
-                    df_filtered = df_filtered[df_filtered["Setor"] == filtro_setor]
-                if filtro_finalizador != "Todos":
-                    df_filtered = df_filtered[df_filtered["finalizado_por"] == filtro_finalizador]
-                    
-                cols_exibicao = ["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Prazo_Limite", "Status_Prazo", "Status", "Equipamento", "Solucao", "Itens_Trocados", "finalizado_por"]
-                st.dataframe(df_filtered[cols_exibicao].sort_values(by="ID", ascending=False), use_container_width=True)
-                
-                st.markdown("---")
-                
-                aba_os_ges1, aba_os_ges2 = st.tabs(["✏️ Editar / Finalizar O.S.", "🗑️ Excluir O.S."])
-                
-                with aba_os_ges1:
-                    ids_os_lista = sorted(df["ID"].tolist(), reverse=True)
-                    if ids_os_lista:
-                        os_selecionada_id = st.selectbox("Selecione o ID da O.S.", ids_os_lista)
-                        row_edit_os = df[df["ID"] == os_selecionada_id].iloc[0]
+                    with st.form("form_editar_os_detalhes"):
+                        st.subheader(f"Editando Ordem de Serviço #{os_selecionada_id}")
                         
-                        with st.form("form_editar_os_detalhes"):
-                            st.subheader(f"Editando Ordem de Serviço #{os_selecionada_id}")
+                        col_e1, col_e2, col_e3 = st.columns(3)
+                        with col_e1:
+                            edit_solicitante = st.text_input("Solicitante", value=str(row_edit_os["Solicitante"]))
+                            edit_setor = st.text_input("Setor", value=str(row_edit_os["Setor"]))
+                        with col_e2:
+                            edit_equip = st.text_input("Equipamento", value=str(row_edit_os["Equipamento"]))
                             
-                            col_e1, col_e2, col_e3 = st.columns(3)
-                            with col_e1:
-                                edit_solicitante = st.text_input("Solicitante", value=str(row_edit_os["Solicitante"]))
-                                edit_setor = st.text_input("Setor", value=str(row_edit_os["Setor"]))
-                            with col_e2:
-                                edit_equip = st.text_input("Equipamento", value=str(row_edit_os["Equipamento"]))
-                                
-                                prio_atual = str(row_edit_os["Prioridade"]).upper()
-                                idx_prio = ["BAIXA", "MÉDIA", "ALTA", "URGENTE"].index(prio_atual) if prio_atual in ["BAIXA", "MÉDIA", "ALTA", "URGENTE"] else 0
-                                edit_prio = st.selectbox("Prioridade", ["BAIXA", "MÉDIA", "ALTA", "URGENTE"], index=idx_prio)
-                            with col_e3:
-                                status_atual_str = str(row_edit_os["Status"])
-                                status_opcoes = ["Em Aberto", "Em Andamento", "Finalizada"]
-                                idx_st = status_opcoes.index(status_atual_str) if status_atual_str in status_opcoes else 0
-                                edit_status = st.selectbox("Status", status_opcoes, index=idx_st)
-                                
-                                finalizado_por_ant = str(row_edit_os["finalizado_por"]) if pd.notna(row_edit_os["finalizado_por"]) and str(row_edit_os["finalizado_por"]).strip() != "" else st.session_state.usuario.upper()
-                                edit_finalizado_por = st.text_input("Responsável pelo serviço", value=finalizado_por_ant)
+                            prio_atual = str(row_edit_os["Prioridade"]).upper()
+                            idx_prio = ["BAIXA", "MÉDIA", "ALTA", "URGENTE"].index(prio_atual) if prio_atual in ["BAIXA", "MÉDIA", "ALTA", "URGENTE"] else 0
+                            edit_prio = st.selectbox("Prioridade", ["BAIXA", "MÉDIA", "ALTA", "URGENTE"], index=idx_prio)
+                        with col_e3:
+                            status_atual_str = str(row_edit_os["Status"])
+                            status_opcoes = ["Em Aberto", "Em Andamento", "Finalizada"]
+                            idx_st = status_opcoes.index(status_atual_str) if status_atual_str in status_opcoes else 0
+                            edit_status = st.selectbox("Status", status_opcoes, index=idx_st)
+                            
+                            finalizado_por_ant = str(row_edit_os["finalizado_por"]) if pd.notna(row_edit_os["finalizado_por"]) and str(row_edit_os["finalizado_por"]).strip() != "" else st.session_state.usuario.upper()
+                            edit_finalizado_por = st.text_input("Responsável pelo serviço", value=finalizado_por_ant)
 
-                            edit_desc = st.text_area("Descrição do Problema", value=str(row_edit_os["Descricao"]))
+                        edit_desc = st.text_area("Descrição do Problema", value=str(row_edit_os["Descricao"]))
+                        
+                        col_e4, col_e5 = st.columns(2)
+                        with col_e4:
+                            sol_ant = str(row_edit_os["Solucao"]) if pd.notna(row_edit_os["Solucao"]) else ""
+                            edit_solucao = st.text_area("Solução Aplicada", value=sol_ant)
+                        with col_e5:
+                            itens_ant = str(row_edit_os["Itens_Trocados"]) if pd.notna(row_edit_os["Itens_Trocados"]) else ""
+                            edit_itens = st.text_area("Itens / Peças Trocadas", value=itens_ant)
                             
-                            col_e4, col_e5 = st.columns(2)
-                            with col_e4:
-                                sol_ant = str(row_edit_os["Solucao"]) if pd.notna(row_edit_os["Solucao"]) else ""
-                                edit_solucao = st.text_area("Solução Aplicada", value=sol_ant)
-                            with col_e5:
-                                itens_ant = str(row_edit_os["Itens_Trocados"]) if pd.notna(row_edit_os["Itens_Trocados"]) else ""
-                                edit_itens = st.text_area("Itens / Peças Trocadas", value=itens_ant)
-                                
-                            col_b_f1, col_b_f2 = st.columns(2)
-                            with col_b_f1:
-                                btn_salvar_alt = st.form_submit_button("💾 Salvar Alterações")
-                            with col_b_f2:
-                                btn_finalizar_direto = st.form_submit_button("✅ Finalizar O.S. Imediatamente")
-                                
-                            if btn_salvar_alt:
-                                df.loc[df["ID"] == os_selecionada_id, "Solicitante"] = edit_solicitante.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Setor"] = edit_setor.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Equipamento"] = edit_equip.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Prioridade"] = edit_prio.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Status"] = edit_status
-                                df.loc[df["ID"] == os_selecionada_id, "Descricao"] = edit_desc.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Solucao"] = edit_solucao.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Itens_Trocados"] = edit_itens.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "finalizado_por"] = edit_finalizado_por.upper()
-                                
-                                if edit_status == "Finalizada":
-                                    df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = datetime.now().strftime("%d/%m/%Y")
-                                else:
-                                    df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = ""
-                                
-                                df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
-                                df_to_save.to_csv(ARQUIVO_OS, index=False)
-                                st.success(f"Ordem de Serviço #{os_selecionada_id} atualizada com sucesso!")
-                                st.rerun()
-                                
-                            if btn_finalizar_direto:
-                                df.loc[df["ID"] == os_selecionada_id, "Status"] = "Finalizada"
+                        col_b_f1, col_b_f2 = st.columns(2)
+                        with col_b_f1:
+                            btn_salvar_alt = st.form_submit_button("💾 Salvar Alterações")
+                        with col_b_f2:
+                            btn_finalizar_direto = st.form_submit_button("✅ Finalizar O.S. Imediatamente")
+                            
+                        if btn_salvar_alt:
+                            df.loc[df["ID"] == os_selecionada_id, "Solicitante"] = edit_solicitante.upper()
+                            df.loc[df["ID"] == os_selecionada_id, "Setor"] = edit_setor.upper()
+                            df.loc[df["ID"] == os_selecionada_id, "Equipamento"] = edit_equip.upper()
+                            df.loc[df["ID"] == os_selecionada_id, "Prioridade"] = edit_prio.upper()
+                            df.loc[df["ID"] == os_selecionada_id, "Status"] = edit_status
+                            df.loc[df["ID"] == os_selecionada_id, "Descricao"] = edit_desc.upper()
+                            df.loc[df["ID"] == os_selecionada_id, "Solucao"] = edit_solucao.upper()
+                            df.loc[df["ID"] == os_selecionada_id, "Itens_Trocados"] = edit_itens.upper()
+                            df.loc[df["ID"] == os_selecionada_id, "finalizado_por"] = edit_finalizado_por.upper()
+                            
+                            if edit_status == "Finalizada":
                                 df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = datetime.now().strftime("%d/%m/%Y")
-                                df.loc[df["ID"] == os_selecionada_id, "finalizado_por"] = edit_finalizado_por.upper()
-                                if str(df.loc[df["ID"] == os_selecionada_id, "Solucao"].values[0]) in ["", "EM ANDAMENTO", "nan"]:
-                                    df.loc[df["ID"] == os_selecionada_id, "Solucao"] = "ATENDIDO E FINALIZADO"
-                                    
-                                df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
-                                df_to_save.to_csv(ARQUIVO_OS, index=False)
-                                st.success(f"Ordem de Serviço #{os_selecionada_id} finalizada com sucesso!")
-                                st.rerun()
-                
-                with aba_os_ges2:
-                    col_del1, col_del2 = st.columns([2, 1])
-                    with col_del1:
-                        os_para_excluir = st.selectbox("Selecione o ID da O.S. para Exclusão", df["ID"].tolist(), key="select_del_os")
-                    with col_del2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("🗑️ Excluir O.S. Selecionada", type="primary"):
-                            df = df[df["ID"] != os_para_excluir]
+                            else:
+                                df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = ""
+                            
                             df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
                             df_to_save.to_csv(ARQUIVO_OS, index=False)
-                            st.success(f"Ordem de Serviço #{os_para_excluir} excluída!")
+                            st.success(f"Ordem de Serviço #{os_selecionada_id} atualizada com sucesso!")
                             st.rerun()
-
-            # --- ABA 2: ENVIAR O.S. POR E-MAIL ---
-            with aba_os_manag2:
-                st.markdown("### 📧 Enviar Ordens de Serviço por E-mail")
-                
-                df_send = df.copy()
-                df_send['Dt_Parsed'] = pd.to_datetime(df_send['Data_Criacao'], format='%d/%m/%Y %H:%M', errors='coerce')
-                if df_send['Dt_Parsed'].isna().all():
-                    df_send['Dt_Parsed'] = pd.to_datetime(df_send['Data_Criacao'], errors='coerce')
-                
-                df_send['Ano'] = df_send['Dt_Parsed'].dt.year
-                df_send['Mes_Ano'] = df_send['Dt_Parsed'].dt.strftime('%m/%Y')
-                df_send['Dia'] = df_send['Dt_Parsed'].dt.date
-                
-                # Filtros globais: número, setor e dia, mês, ano
-                fg_col1, fg_col2, fg_col3, fg_col4, fg_col5 = st.columns(5)
-                
-                with fg_col1:
-                    num_opts = ["Todos"] + sorted(df_send['ID'].astype(str).unique().tolist(), key=lambda x: int(x) if x.isdigit() else x)
-                    f_num = st.selectbox("Número (ID)", num_opts, key="send_f_num")
-                with fg_col2:
-                    setor_opts = ["Todos"] + sorted([s for s in df_send['Setor'].dropna().unique().tolist() if str(s).strip() != ""])
-                    f_setor = st.selectbox("Setor", setor_opts, key="send_f_setor")
-                with fg_col3:
-                    dias_opts = ["Todos"] + sorted([str(d) for d in df_send['Dia'].dropna().unique().tolist()])
-                    f_dia = st.selectbox("Dia Exato", dias_opts, key="send_f_dia")
-                with fg_col4:
-                    meses_opts = ["Todos"] + sorted([str(m) for m in df_send['Mes_Ano'].dropna().unique().tolist()])
-                    f_mes = st.selectbox("Mês/Ano", meses_opts, key="send_f_mes")
-                with fg_col5:
-                    anos_opts = ["Todos"] + sorted([str(int(a)) for a in df_send['Ano'].dropna().unique() if pd.notna(a)])
-                    f_ano = st.selectbox("Ano", anos_opts, key="send_f_ano")
-                    
-                if f_num != "Todos":
-                    df_send = df_send[df_send['ID'].astype(str) == f_num]
-                if f_setor != "Todos":
-                    df_send = df_send[df_send['Setor'] == f_setor]
-                if f_dia != "Todos":
-                    df_send = df_send[df_send['Dia'].astype(str) == f_dia]
-                if f_mes != "Todos":
-                    df_send = df_send[df_send['Mes_Ano'] == f_mes]
-                if f_ano != "Todos":
-                    df_send = df_send[df_send['Ano'].astype(str) == f_ano]
-                    
-                st.markdown("---")
-                
-                col_m_left, col_m_right = st.columns([1.3, 1])
-                
-                with col_m_left:
-                    st.markdown("#### 1. Selecione as Ordens de Serviço")
-                    if df_send.empty:
-                        st.info("Nenhuma O.S. encontrada para os filtros aplicados.")
-                        os_selecionadas_ids = []
-                    else:
-                        df_send['Selecionar'] = False
-                        edited_df = st.data_editor(
-                            df_send[["Selecionar", "ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Status"]],
-                            hide_index=True,
-                            use_container_width=True,
-                            key="editor_os_email"
-                        )
-                        os_selecionadas_ids = edited_df[edited_df['Selecionar'] == True]['ID'].tolist()
-                        st.caption(f"Total de O.S. selecionadas: **{len(os_selecionadas_ids)}**")
-
-                with col_m_right:
-                    st.markdown("#### 2. Janela de Envio por E-mail")
-                    
-                    df_u_send = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                    row_logged_send = df_u_send[df_u_send["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                    email_user_default = ""
-                    if not row_logged_send.empty:
-                        email_user_default = str(row_logged_send.iloc[0].get("Email_Usuario", ""))
-
-                    with st.form("form_janela_envio_os_email"):
-                        para_input = st.text_input("Para:", value=email_user_default if email_user_default else "financeiro@stang.com.br")
-                        assunto_input = st.text_input("Assunto:", value="Envio de Ordens de Serviço - Intranet Stang")
-                        
-                        corpo_padrao = "Prezado(a),\n\nSegue(m) em anexo a(s) Ordem(ns) de Serviço solicitada(s).\n\nAtenciosamente,\nEquipe de Manutenção Stang"
-                        mensagem_input = st.text_area("Mensagem:", value=corpo_padrao, height=140)
-                        
-                        anexar_html = st.checkbox("Anexar relatórios de O.S. selecionadas em formato HTML/Printable", value=True)
-                        
-                        btn_disparar_email = st.form_submit_button("🚀 Enviar E-mail", use_container_width=True)
-                        
-                        if btn_disparar_email:
-                            if not para_input:
-                                st.error("Informe o e-mail do destinatário.")
-                            elif not os_selecionadas_ids:
-                                st.warning("Selecione pelo menos uma Ordem de Serviço na tabela ao lado para enviar.")
-                            else:
-                                if row_logged_send.empty:
-                                    st.error("Configurações do usuário não foram encontradas.")
-                                else:
-                                    u_dict = row_logged_send.iloc[0].to_dict()
-                                    cfg_mail = {
-                                        "Email_Remetente": u_dict.get("Email_Usuario", ""),
-                                        "Senha_App": u_dict.get("Senha_App_Email", ""),
-                                        "Servidor_SMTP": u_dict.get("Servidor_SMTP", "smtp.gmail.com"),
-                                        "Porta_SMTP": u_dict.get("Porta_SMTP", "587"),
-                                        "Nome_Remetente": st.session_state.usuario
-                                    }
-                                    
-                                    anexos_os_envio = []
-                                    
-                                    if anexar_html:
-                                        for os_id_item in os_selecionadas_ids:
-                                            row_os_match = df[df["ID"] == os_id_item].iloc[0]
-                                            html_conteudo = gerar_html_os_impressao(row_os_match)
-                                            nome_arquivo_anexo = f"OS_{os_id_item}.html"
-                                            anexos_os_envio.append((html_conteudo.encode('utf-8'), nome_arquivo_anexo))
-                                    
-                                    sucesso_send, msg_send = enviar_email_real(
-                                        destinatario=para_input,
-                                        assunto=assunto_input,
-                                        corpo=mensagem_input,
-                                        anexos=anexos_os_envio,
-                                        config=cfg_mail
-                                    )
-                                    
-                                    if sucesso_send:
-                                        st.success(f"E-mail enviado com sucesso para {para_input}!")
-                                    else:
-                                        st.error(f"Erro ao enviar e-mail: {msg_send}")
+                            
+                        if btn_finalizar_direto:
+                            df.loc[df["ID"] == os_selecionada_id, "Status"] = "Finalizada"
+                            df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = datetime.now().strftime("%d/%m/%Y")
+                            df.loc[df["ID"] == os_selecionada_id, "finalizado_por"] = edit_finalizado_por.upper()
+                            if str(df.loc[df["ID"] == os_selecionada_id, "Solucao"].values[0]) in ["", "EM ANDAMENTO", "nan"]:
+                                df.loc[df["ID"] == os_selecionada_id, "Solucao"] = "ATENDIDO E FINALIZADO"
+                                
+                            df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
+                            df_to_save.to_csv(ARQUIVO_OS, index=False)
+                            st.success(f"Ordem de Serviço #{os_selecionada_id} finalizada com sucesso!")
+                            st.rerun()
+            
+            with aba_os_ges2:
+                col_del1, col_del2 = st.columns([2, 1])
+                with col_del1:
+                    os_para_excluir = st.selectbox("Selecione o ID da O.S. para Exclusão", df["ID"].tolist(), key="select_del_os")
+                with col_del2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🗑️ Excluir O.S. Selecionada", type="primary"):
+                        df = df[df["ID"] != os_para_excluir]
+                        df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
+                        df_to_save.to_csv(ARQUIVO_OS, index=False)
+                        st.success(f"Ordem de Serviço #{os_para_excluir} excluída!")
+                        st.rerun()
 
     # --- TELA 3: IMPRIMIR O.S. ---
     elif menu == "🖨️ Imprimir O.S.":
@@ -1177,7 +1111,95 @@ if menu is not None:
                 
                 st.markdown("---")
                 
-                print_html = gerar_html_os_impressao(os_row)
+                equipamento_val = os_row['Equipamento'] if pd.notna(os_row.get('Equipamento')) else 'N/A'
+                solucao_val = os_row['Solucao'] if pd.notna(os_row.get('Solucao')) else ''
+                itens_val = os_row['Itens_Trocados'] if pd.notna(os_row.get('Itens_Trocados')) else ''
+                finalizador_val = os_row['finalizado_por'] if pd.notna(os_row.get('finalizado_por')) else ''
+                data_criacao_val = str(os_row['Data_Criacao'])
+                
+                logo_base64 = ""
+                if os.path.exists("logo.png"):
+                    with open("logo.png", "rb") as img_file:
+                        logo_base64 = base64.b64encode(img_file.read()).decode()
+                
+                print_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
+        .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
+        .btn-imprimir {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
+        @media print {{ .print-btn-container {{ display: none !important; }} body {{ padding: 0; }} }}
+    </style>
+</head>
+<body>
+    <div class="print-btn-container">
+        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir O.S.</button>
+    </div>
+    <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+            <tr>
+                <td style="width: 28%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
+                    <img src="data:image/png;base64,{logo_base64}" style="max-height: 45px; max-width: 100%;">
+                </td>
+                <td style="width: 44%; border: 1px solid #000; text-align: center; vertical-align: middle;">
+                    <h3 style="margin: 0; color: #000 !important; font-size: 15px;">Solicitação de Manutenção - Ordem de Serviço</h3>
+                </td>
+                <td style="width: 28%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
+                    <b>FM 12</b><br>Revisão: 02/2024
+                </td>
+            </tr>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Número:</b> {os_row['ID']}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 34%;"><b>Data:</b> {data_criacao_val.split(' ')[0]}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Hora:</b> {data_criacao_val.split(' ')[1] if len(data_criacao_val.split(' ')) > 1 else '17:00'}</td>
+            </tr>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; text-align: center; color: #000 !important;">
+            <tr>
+                <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Tipo de Manutenção</b></td>
+                <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Prioridade de Manutenção</b></td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{os_row['Tipo_Manutencao']}</td>
+                <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{os_row['Prioridade']}</td>
+            </tr>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SETOR:</b> {os_row['Setor']}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SOLICITANTE:</b> {os_row['Solicitante']}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px;" colspan="2"><b>Equipamento:</b> {equipamento_val}</td>
+            </tr>
+        </table>
+        <div style="border: 1px solid #000; border-top: none;">
+            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição do Problema</div>
+            <div style="padding: 10px; min-height: 70px; font-size: 13px; color: #000 !important;">{os_row['Descricao']}</div>
+        </div>
+        <div style="border: 1px solid #000; border-top: none;">
+            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição da Solução</div>
+            <div style="padding: 10px; min-height: 50px; font-size: 13px; color: #000 !important;">{solucao_val}</div>
+        </div>
+        <div style="border: 1px solid #000; border-top: none;">
+            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Itens Trocados</div>
+            <div style="padding: 10px; min-height: 40px; font-size: 13px; color: #000 !important;">{itens_val}</div>
+        </div>
+        <table style="width: 100%; margin-top: 35px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
+            <tr>
+                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Manutenção</b></td>
+                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Responsável pelo Serviço ({finalizador_val})</b></td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
+"""
                 components.html(print_html, height=920, scrolling=True)
 
             with tab_imp2:
@@ -1220,6 +1242,108 @@ if menu is not None:
                 
                 if not df_f_rep.empty:
                     st.dataframe(df_f_rep[["ID", "Data_Criacao", "Solicitante", "Setor", "Equipamento", "Tipo_Manutencao", "Prioridade", "Status", "Solucao", "finalizado_por"]], use_container_width=True)
+
+    # --- TELA: ENVIAR ORDENS DE SERVIÇO POR E-MAIL ---
+    elif menu == "📧 Enviar Ordens de Serviço por E-mail":
+        st.markdown("# 📧 Enviar Ordens de Serviço por E-mail")
+        st.markdown("Selecione uma Ordem de Serviço cadastrada para gerar o PDF e enviá-la via e-mail.")
+        
+        df_os_email = carregar_banco_os()
+        if df_os_email.empty:
+            st.warning("Nenhuma Ordem de Serviço cadastrada no sistema.")
+        else:
+            lista_os_email = df_os_email["ID"].astype(str) + " - " + df_os_email["Solicitante"] + " (" + df_os_email["Setor"] + ")"
+            os_email_sel = st.selectbox("Selecione a Ordem de Serviço:", lista_os_email, key="sel_os_email_page")
+            
+            id_os_email = int(os_email_sel.split(" - ")[0])
+            row_os_email = df_os_email[df_os_email["ID"] == id_os_email].iloc[0]
+            
+            st.markdown("---")
+            col_preview, col_form_email = st.columns([1.2, 1])
+            
+            with col_preview:
+                st.markdown("### 📄 Pré-visualização dos Dados da O.S.")
+                st.info(
+                    f"**O.S. Número:** #{row_os_email['ID']}\n\n"
+                    f"**Data de Criação:** {row_os_email['Data_Criacao']}\n\n"
+                    f"**Solicitante:** {row_os_email['Solicitante']} | **Setor:** {row_os_email['Setor']}\n\n"
+                    f"**Equipamento:** {row_os_email['Equipamento']}\n\n"
+                    f"**Tipo / Prioridade:** {row_os_email['Tipo_Manutencao']} / {row_os_email['Prioridade']}\n\n"
+                    f"**Status:** {row_os_email['Status']}\n\n"
+                    f"**Descrição:** {row_os_email['Descricao']}\n\n"
+                    f"**Solução:** {row_os_email.get('Solucao', '')}"
+                )
+                
+                # Botão para baixar o PDF gerado
+                pdf_bytes_preview = gerar_pdf_os_bytes(row_os_email)
+                if pdf_bytes_preview:
+                    st.download_button(
+                        label=f"📥 Baixar O.S. #{id_os_email} em PDF",
+                        data=pdf_bytes_preview,
+                        file_name=f"OS_{id_os_email}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+                else:
+                    st.error("Instale as bibliotecas de PDF (pypdf e reportlab) para habilitar o PDF.")
+            
+            with col_form_email:
+                st.markdown("### ✉️ Formuário de Envio")
+                with st.form("form_envio_os_pdf_email"):
+                    destinatario_os = st.text_input("E-mail do Destinatário *")
+                    assunto_os = st.text_input("Assunto do E-mail", value=f"Ordem de Serviço #{id_os_email} - {row_os_email['Setor']}")
+                    
+                    corpo_padrao = (
+                        f"Olá,\n\n"
+                        f"Segue em anexo no formato PDF a Ordem de Serviço #{id_os_email}.\n\n"
+                        f"Solicitante: {row_os_email['Solicitante']}\n"
+                        f"Setor: {row_os_email['Setor']}\n"
+                        f"Equipamento: {row_os_email['Equipamento']}\n"
+                        f"Status: {row_os_email['Status']}\n\n"
+                        f"Atenciosamente,\n"
+                        f"Equipe Intranet Stang"
+                    )
+                    corpo_os = st.text_area("Corpo da Mensagem", value=corpo_padrao, height=180)
+                    
+                    btn_disparar_email = st.form_submit_button("🚀 Enviar O.S. por E-mail", use_container_width=True)
+                    
+                    if btn_disparar_email:
+                        if not destinatario_os:
+                            st.error("Informe o e-mail do destinatário.")
+                        else:
+                            df_u_check_e = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                            row_u_logged_e = df_u_check_e[df_u_check_e["Usuario"].str.lower() == st.session_state.usuario.lower()]
+                            
+                            if row_u_logged_e.empty:
+                                st.error("Dados de configuração SMTP do usuário não encontrados.")
+                            else:
+                                u_row_dict_e = row_u_logged_e.iloc[0].to_dict()
+                                cfg_email_os = {
+                                    "Email_Remetente": u_row_dict_e.get("Email_Usuario", ""),
+                                    "Senha_App": u_row_dict_e.get("Senha_App_Email", ""),
+                                    "Servidor_SMTP": u_row_dict_e.get("Servidor_SMTP", "smtp.gmail.com"),
+                                    "Porta_SMTP": u_row_dict_e.get("Porta_SMTP", "587"),
+                                    "Nome_Remetente": st.session_state.usuario
+                                }
+                                
+                                pdf_bytes_envio = gerar_pdf_os_bytes(row_os_email)
+                                if not pdf_bytes_envio:
+                                    st.error("Não foi possível gerar o arquivo PDF para anexo.")
+                                else:
+                                    anexos_os = [(f"OS_{id_os_email}.pdf", pdf_bytes_envio)]
+                                    
+                                    sucesso_send, msg_send = enviar_email_real(
+                                        destinatario=destinatario_os,
+                                        assunto=assunto_os,
+                                        corpo=corpo_os,
+                                        anexos=anexos_os,
+                                        config=cfg_email_os
+                                    )
+                                    
+                                    if sucesso_send:
+                                        st.success(f"Ordem de Serviço #{id_os_email} enviada em PDF com sucesso para {destinatario_os}!")
+                                    else:
+                                        st.error(f"Erro no envio: {msg_send}")
 
     # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---
     elif menu == "📅 Formulários e Prazos (FMs)":
@@ -1735,6 +1859,7 @@ if menu is not None:
                 else:
                     ids_ass = sorted(df_ass["ID_Compra"].unique().tolist(), reverse=True)
                     
+                    # Layout do topo: Seleção do Pedido e Botão de Assinar na mesma linha/coeso
                     col_sel1, col_sel2 = st.columns([2.5, 1])
                     
                     with col_sel1:
@@ -1742,6 +1867,7 @@ if menu is not None:
                         rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
                         row_base_ass = rows_ass.iloc[0]
                     
+                    # Buscar assinatura em PNG vinculada ao usuário logado
                     df_u_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
                     row_u_logged = df_u_check[df_u_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
                     ass_png_path = "None"
@@ -1774,6 +1900,7 @@ if menu is not None:
                             else:
                                 st.error("Nenhum documento válido encontrado/anexado para assinar.")
 
+                    # --- QUADRO DE STATUS INTUITIVO, COMPACTO E VISUAL DO PEDIDO ---
                     p_orc = row_base_ass.get("Orcamento_Assinado", "None")
                     p_nf = row_base_ass.get("NF_Anexada", "None")
                     p_bol = row_base_ass.get("Boleto_Anexado", "None")
@@ -1810,6 +1937,7 @@ if menu is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
+                    # Descrição/Resumo do pedido para saber a que se refere o número do pedido
                     itens_do_pedido_str = ", ".join([f"{r['Item']} (Qtd: {r['Quantidade']})" for _, r in rows_ass.iterrows()])
                     solicitante_pedido = row_base_ass.get("Solicitante", "N/A")
                     setor_pedido = row_base_ass.get("Setor", "N/A")
@@ -1921,26 +2049,32 @@ if menu is not None:
     elif menu == "📊 Dashboard":
         st.markdown("# 📊 Painel Geral de Indicadores e Métricas Stang")
         
+        # Carregamento de dados prévio para popular filtros
         df_os_raw = carregar_banco_os()
         df_c_raw = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
 
+        # Tratar datas O.S.
         if not df_os_raw.empty:
             df_os_raw['Data_Parsed'] = pd.to_datetime(df_os_raw['Data_Criacao'].astype(str).str.split(' ').str[0], format='%d/%m/%Y', errors='coerce')
         else:
             df_os_raw['Data_Parsed'] = pd.NaT
 
+        # Tratar datas Compras
         if not df_c_raw.empty:
             df_c_raw['Data_Parsed'] = pd.to_datetime(df_c_raw['Data_Solicitacao'].astype(str).str.split(' ').str[0], format='%Y-%m-%d', errors='coerce')
         else:
             df_c_raw['Data_Parsed'] = pd.NaT
 
+        # --- FILTROS GLOBAIS ESTILO POWER BI ---
         with st.expander("🔍 **Filtros Interativos do Dashboard**", expanded=True):
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             
+            # Opções de Setores unificados
             setores_os = df_os_raw['Setor'].dropna().unique().tolist() if not df_os_raw.empty else []
             setores_c = df_c_raw['Setor'].dropna().unique().tolist() if not df_c_raw.empty else []
             lista_setores = ["Todos"] + sorted(list(set(setores_os + setores_c)))
 
+            # Opções de Solicitantes unificados
             solic_os = df_os_raw['Solicitante'].dropna().unique().tolist() if not df_os_raw.empty else []
             solic_c = df_c_raw['Solicitante'].dropna().unique().tolist() if not df_c_raw.empty else []
             lista_solicitantes = ["Todos"] + sorted(list(set(solic_os + solic_c)))
@@ -1954,6 +2088,7 @@ if menu is not None:
             with f_col4:
                 data_fim = st.date_input("📅 Data Final", value=None, key="dash_f_dfim")
 
+        # Aplicação dos Filtros nas Bases
         df_os_filtered = df_os_raw.copy()
         df_c_filtered = df_c_raw.copy()
 
@@ -1973,6 +2108,7 @@ if menu is not None:
             if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Data_Parsed'].dt.date <= data_fim]
             if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Data_Parsed'].dt.date <= data_fim]
 
+        # Template de layout transparente para o Plotly estilo PowerBI Dark
         layout_transparente = dict(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
@@ -2002,6 +2138,7 @@ if menu is not None:
                 
                 col_g1, col_g2 = st.columns(2)
                 
+                # Gráfico 1: Rosca (Status) Estilo Power BI
                 with col_g1:
                     fig_status = px.pie(
                         df_os_filtered, 
@@ -2014,6 +2151,7 @@ if menu is not None:
                     fig_status.update_layout(**layout_transparente)
                     st.plotly_chart(fig_status, use_container_width=True)
                 
+                # Gráfico 2: Barras Horizontais (Prioridade por Status)
                 with col_g2:
                     fig_prio = px.histogram(
                         df_os_filtered, 
@@ -2029,6 +2167,7 @@ if menu is not None:
 
                 col_g3, col_g4 = st.columns(2)
 
+                # Gráfico 3: Volume por Setor
                 with col_g3:
                     df_setor_cnt = df_os_filtered["Setor"].value_counts().reset_index()
                     df_setor_cnt.columns = ["Setor", "Qtd"]
@@ -2037,71 +2176,8 @@ if menu is not None:
                         x="Setor", 
                         y="Qtd", 
                         title="<b>Total de O.S. por Setor</b>",
+                        text_auto=True,
                         color="Qtd",
                         color_continuous_scale="Viridis"
                     )
                     fig_setor.update_layout(**layout_transparente)
-                    fig_setor.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
-                    st.plotly_chart(fig_setor, use_container_width=True)
-
-                with col_g4:
-                    df_solic_cnt = df_os_filtered["Solicitante"].value_counts().head(7).reset_index()
-                    df_solic_cnt.columns = ["Solicitante", "Qtd"]
-                    fig_solic = px.bar(
-                        df_solic_cnt, 
-                        x="Qtd", 
-                        y="Solicitante", 
-                        title="<b>Top 7 Solicitantes de O.S.</b>",
-                        orientation="h",
-                        color="Qtd",
-                        color_continuous_scale="Cividis"
-                    )
-                    fig_solic.update_layout(**layout_transparente)
-                    fig_solic.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
-                    st.plotly_chart(fig_solic, use_container_width=True)
-
-        with tab_dash2:
-            if df_c_filtered.empty:
-                st.info("Nenhuma solicitação de compra encontrada para os filtros selecionados.")
-            else:
-                total_c = len(df_c_filtered)
-                c_abertas = len(df_c_filtered[df_c_filtered["Status"].str.contains("Aberta", case=False, na=False)])
-                c_realizadas = len(df_c_filtered[df_c_filtered["Status"].str.contains("Realizada", case=False, na=False)])
-                c_recusadas = len(df_c_filtered[df_c_filtered["Status"].str.contains("Recusada", case=False, na=False)])
-
-                cm1, cm2, cm3, cm4 = st.columns(4)
-                cm1.metric("Total de Pedidos", total_c)
-                cm2.metric("Em Aberta 🟠", c_abertas)
-                cm3.metric("Realizadas 🟢", c_realizadas)
-                cm4.metric("Recusadas 🔴", c_recusadas)
-
-                st.markdown("---")
-
-                cg1, cg2 = st.columns(2)
-
-                with cg1:
-                    fig_c_status = px.pie(
-                        df_c_filtered, 
-                        names="Status", 
-                        title="<b>Status das Compras</b>",
-                        hole=0.5,
-                        color_discrete_sequence=px.colors.qualitative.Safe
-                    )
-                    fig_c_status.update_traces(textposition='inside', textinfo='percent+label')
-                    fig_c_status.update_layout(**layout_transparente)
-                    st.plotly_chart(fig_c_status, use_container_width=True)
-
-                with cg2:
-                    df_cat_cnt = df_c_filtered["Categoria"].value_counts().reset_index()
-                    df_cat_cnt.columns = ["Categoria", "Qtd"]
-                    fig_cat = px.bar(
-                        df_cat_cnt, 
-                        x="Categoria", 
-                        y="Qtd", 
-                        title="<b>Itens Solicitados por Categoria</b>",
-                        color="Qtd",
-                        color_continuous_scale="Magma"
-                    )
-                    fig_cat.update_layout(**layout_transparente)
-                    fig_cat.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
-                    st.plotly_chart(fig_cat, use_container_width=True)
