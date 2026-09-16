@@ -18,6 +18,10 @@ import io
 try:
     from pypdf import PdfReader, PdfWriter
     from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table as RLTable, TableStyle, Image as RLImage
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
     HAS_PDF_LIBS = True
 except ImportError:
     HAS_PDF_LIBS = False
@@ -318,6 +322,169 @@ def exibir_documento(caminho_arquivo, titulo):
                 file_name=os.path.basename(str(caminho_arquivo)),
                 use_container_width=True
             )
+
+# --- FUNÇÃO PARA GERAR O PDF DA ORDEM DE SERVIÇO ---
+def gerar_pdf_os(os_row):
+    if not HAS_PDF_LIBS:
+        return None
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    styles = getSampleStyleSheet()
+    
+    style_title = ParagraphStyle('Title', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, alignment=1)
+    style_header_right = ParagraphStyle('HeaderRight', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, alignment=2)
+    style_cell_bold = ParagraphStyle('CellBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9)
+    style_cell_normal = ParagraphStyle('CellNormal', parent=styles['Normal'], fontName='Helvetica', fontSize=9)
+    style_cell_center_bold = ParagraphStyle('CellCenterBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, alignment=1)
+    
+    elements = []
+    
+    # 1. Tabela de Cabeçalho (Logo, Título e FM)
+    logo_cell = Paragraph("<b>STANG</b>", style_title)
+    if os.path.exists("logo.png"):
+        try:
+            logo_cell = RLImage("logo.png", width=100, height=35)
+        except Exception:
+            pass
+            
+    header_data = [
+        [
+            logo_cell,
+            Paragraph("<b>Solicitação de Manutenção - Ordem de Serviço</b>", style_title),
+            Paragraph("<b>FM 12</b><br/>Revisão: 02/2024", style_header_right)
+        ]
+    ]
+    t_header = RLTable(header_data, colWidths=[120, 280, 140])
+    t_header.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (0,0), (0,0), 'CENTER'),
+        ('PADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t_header)
+    elements.append(Spacer(1, 4))
+    
+    # 2. Dados de Identificação (Número, Data, Hora)
+    data_criacao_val = str(os_row.get('Data_Criacao', ''))
+    partes_dt = data_criacao_val.split(' ')
+    data_str = partes_dt[0] if len(partes_dt) > 0 else ''
+    hora_str = partes_dt[1] if len(partes_dt) > 1 else '17:00'
+    
+    info_data = [
+        [
+            Paragraph(f"<b>Número:</b> {os_row.get('ID', '')}", style_cell_normal),
+            Paragraph(f"<b>Data:</b> {data_str}", style_cell_normal),
+            Paragraph(f"<b>Hora:</b> {hora_str}", style_cell_normal)
+        ]
+    ]
+    t_info = RLTable(info_data, colWidths=[180, 180, 180])
+    t_info.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('PADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t_info)
+    elements.append(Spacer(1, 4))
+    
+    # 3. Tipo e Prioridade
+    prio_data = [
+        [
+            Paragraph("Tipo de Manutenção", style_cell_center_bold),
+            Paragraph("Prioridade de Manutenção", style_cell_center_bold)
+        ],
+        [
+            Paragraph(f"<b>{os_row.get('Tipo_Manutencao', '')}</b>", style_cell_center_bold),
+            Paragraph(f"<b>{os_row.get('Prioridade', '')}</b>", style_cell_center_bold)
+        ]
+    ]
+    t_prio = RLTable(prio_data, colWidths=[270, 270])
+    t_prio.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('BACKGROUND', (0,0), (1,0), colors.HexColor('#e0e0e0')),
+        ('PADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t_prio)
+    elements.append(Spacer(1, 4))
+    
+    # 4. Setor, Solicitante e Equipamento
+    equip_val = os_row.get('Equipamento', 'N/A')
+    if pd.isna(equip_val) or str(equip_val).strip() == "":
+        equip_val = 'N/A'
+        
+    solic_data = [
+        [
+            Paragraph(f"<b>SETOR:</b> {os_row.get('Setor', '')}", style_cell_normal),
+            Paragraph(f"<b>SOLICITANTE:</b> {os_row.get('Solicitante', '')}", style_cell_normal)
+        ],
+        [
+            Paragraph(f"<b>Equipamento:</b> {equip_val}", style_cell_normal),
+            ""
+        ]
+    ]
+    t_solic = RLTable(solic_data, colWidths=[270, 270])
+    t_solic.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+        ('SPAN', (0,1), (1,1)),
+        ('PADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t_solic)
+    elements.append(Spacer(1, 4))
+    
+    # 5. Seções de Texto: Descrição, Solução, Itens Trocados
+    def criar_secao_texto(titulo, conteudo, min_height=40):
+        val_txt = conteudo if pd.notna(conteudo) else ""
+        sec_data = [
+            [Paragraph(f"<b>{titulo}</b>", style_cell_center_bold)],
+            [Paragraph(str(val_txt).replace('\n', '<br/>'), style_cell_normal)]
+        ]
+        t_sec = RLTable(sec_data, colWidths=[540], rowHeights=[18, max(min_height, 35)])
+        t_sec.setStyle(TableStyle([
+            ('BOX', (0,0), (-1,-1), 1, colors.black),
+            ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
+            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#e0e0e0')),
+            ('VALIGN', (0,1), (0,1), 'TOP'),
+            ('PADDING', (0,0), (-1,-1), 4),
+        ]))
+        return t_sec
+
+    elements.append(criar_secao_texto("Descrição do Problema", os_row.get('Descricao', ''), min_height=60))
+    elements.append(Spacer(1, 4))
+    elements.append(criar_secao_texto("Descrição da Solução", os_row.get('Solucao', ''), min_height=45))
+    elements.append(Spacer(1, 4))
+    elements.append(criar_secao_texto("Itens Trocados", os_row.get('Itens_Trocados', ''), min_height=35))
+    elements.append(Spacer(1, 25))
+    
+    # 6. Assinaturas
+    finalizador_val = os_row.get('finalizado_por', '')
+    if pd.isna(finalizador_val):
+        finalizador_val = ''
+        
+    ass_data = [
+        [
+            Paragraph("__________________________________________________<br/><b>Manutenção</b>", style_cell_center_bold),
+            Paragraph(f"__________________________________________________<br/><b>Responsável pelo Serviço ({finalizador_val})</b>", style_cell_center_bold)
+        ]
+    ]
+    t_ass = RLTable(ass_data, colWidths=[270, 270])
+    t_ass.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(t_ass)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 # --- FUNÇÃO PARA GERAR O HTML COMPLETO DA OS DA IMPRESSÃO ---
 def gerar_html_os_impressao(os_row):
@@ -1111,10 +1278,8 @@ if menu is not None:
                         para_input = st.text_input("Para:", value=email_user_default if email_user_default else "financeiro@stang.com.br")
                         assunto_input = st.text_input("Assunto:", value="Envio de Ordens de Serviço - Intranet Stang")
                         
-                        corpo_padrao = "Prezado(a),\n\nSegue(m) em anexo a(s) Ordem(ns) de Serviço solicitada(s).\n\nAtenciosamente,\nEquipe de Manutenção Stang"
+                        corpo_padrao = "Prezado(a),\n\nSegue(m) em anexo a(s) Ordem(ns) de Serviço solicitada(s) em formato PDF.\n\nAtenciosamente,\nEquipe de Manutenção Stang"
                         mensagem_input = st.text_area("Mensagem:", value=corpo_padrao, height=140)
-                        
-                        anexar_html = st.checkbox("Anexar relatórios de O.S. selecionadas em formato HTML/Printable", value=True)
                         
                         btn_disparar_email = st.form_submit_button("🚀 Enviar E-mail", use_container_width=True)
                         
@@ -1123,6 +1288,8 @@ if menu is not None:
                                 st.error("Informe o e-mail do destinatário.")
                             elif not os_selecionadas_ids:
                                 st.warning("Selecione pelo menos uma Ordem de Serviço na tabela ao lado para enviar.")
+                            elif not HAS_PDF_LIBS:
+                                st.error("Bibliotecas de PDF (reportlab / pypdf) não estão instaladas no servidor!")
                             else:
                                 if row_logged_send.empty:
                                     st.error("Configurações do usuário não foram encontradas.")
@@ -1138,12 +1305,12 @@ if menu is not None:
                                     
                                     anexos_os_envio = []
                                     
-                                    if anexar_html:
-                                        for os_id_item in os_selecionadas_ids:
-                                            row_os_match = df[df["ID"] == os_id_item].iloc[0]
-                                            html_conteudo = gerar_html_os_impressao(row_os_match)
-                                            nome_arquivo_anexo = f"OS_{os_id_item}.html"
-                                            anexos_os_envio.append((html_conteudo.encode('utf-8'), nome_arquivo_anexo))
+                                    for os_id_item in os_selecionadas_ids:
+                                        row_os_match = df[df["ID"] == os_id_item].iloc[0]
+                                        pdf_bytes = gerar_pdf_os(row_os_match)
+                                        if pdf_bytes:
+                                            nome_arquivo_anexo = f"OS_{os_id_item}.pdf"
+                                            anexos_os_envio.append((pdf_bytes, nome_arquivo_anexo))
                                     
                                     sucesso_send, msg_send = enviar_email_real(
                                         destinatario=para_input,
@@ -1154,7 +1321,7 @@ if menu is not None:
                                     )
                                     
                                     if sucesso_send:
-                                        st.success(f"E-mail enviado com sucesso para {para_input}!")
+                                        st.success(f"E-mail enviado com sucesso para {para_input} com o(s) PDF(s) anexado(s)!")
                                     else:
                                         st.error(f"Erro ao enviar e-mail: {msg_send}")
 
@@ -1916,192 +2083,3 @@ if menu is not None:
                         exibir_documento(row_base_ass.get("NF_Anexada", "None"), "Nota Fiscal")
                     with c_doc3:
                         exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
-
-    # --- TELA 6: DASHBOARD ANALÍTICO INTERATIVO (POWER BI STYLE) ---
-    elif menu == "📊 Dashboard":
-        st.markdown("# 📊 Painel Geral de Indicadores e Métricas Stang")
-        
-        df_os_raw = carregar_banco_os()
-        df_c_raw = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-
-        if not df_os_raw.empty:
-            df_os_raw['Data_Parsed'] = pd.to_datetime(df_os_raw['Data_Criacao'].astype(str).str.split(' ').str[0], format='%d/%m/%Y', errors='coerce')
-        else:
-            df_os_raw['Data_Parsed'] = pd.NaT
-
-        if not df_c_raw.empty:
-            df_c_raw['Data_Parsed'] = pd.to_datetime(df_c_raw['Data_Solicitacao'].astype(str).str.split(' ').str[0], format='%Y-%m-%d', errors='coerce')
-        else:
-            df_c_raw['Data_Parsed'] = pd.NaT
-
-        with st.expander("🔍 **Filtros Interativos do Dashboard**", expanded=True):
-            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            
-            setores_os = df_os_raw['Setor'].dropna().unique().tolist() if not df_os_raw.empty else []
-            setores_c = df_c_raw['Setor'].dropna().unique().tolist() if not df_c_raw.empty else []
-            lista_setores = ["Todos"] + sorted(list(set(setores_os + setores_c)))
-
-            solic_os = df_os_raw['Solicitante'].dropna().unique().tolist() if not df_os_raw.empty else []
-            solic_c = df_c_raw['Solicitante'].dropna().unique().tolist() if not df_c_raw.empty else []
-            lista_solicitantes = ["Todos"] + sorted(list(set(solic_os + solic_c)))
-
-            with f_col1:
-                filtro_dash_setor = st.selectbox("🏢 Setor", lista_setores, key="dash_f_setor")
-            with f_col2:
-                filtro_dash_solic = st.selectbox("👤 Solicitante", lista_solicitantes, key="dash_f_solic")
-            with f_col3:
-                data_inicio = st.date_input("📅 Data Inicial", value=None, key="dash_f_dini")
-            with f_col4:
-                data_fim = st.date_input("📅 Data Final", value=None, key="dash_f_dfim")
-
-        df_os_filtered = df_os_raw.copy()
-        df_c_filtered = df_c_raw.copy()
-
-        if filtro_dash_setor != "Todos":
-            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Setor'] == filtro_dash_setor]
-            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Setor'] == filtro_dash_setor]
-
-        if filtro_dash_solic != "Todos":
-            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Solicitante'] == filtro_dash_solic]
-            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Solicitante'] == filtro_dash_solic]
-
-        if data_inicio:
-            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Data_Parsed'].dt.date >= data_inicio]
-            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Data_Parsed'].dt.date >= data_inicio]
-
-        if data_fim:
-            if not df_os_filtered.empty: df_os_filtered = df_os_filtered[df_os_filtered['Data_Parsed'].dt.date <= data_fim]
-            if not df_c_filtered.empty: df_c_filtered = df_c_filtered[df_c_filtered['Data_Parsed'].dt.date <= data_fim]
-
-        layout_transparente = dict(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#ffffff", size=12),
-            margin=dict(l=20, r=20, t=40, b=20),
-            legend=dict(font=dict(color="#ffffff"))
-        )
-
-        tab_dash1, tab_dash2 = st.tabs(["📊 Indicadores O.S.", "🛒 Indicadores Compras"])
-        
-        with tab_dash1:
-            if df_os_filtered.empty:
-                st.info("Nenhuma Ordem de Serviço encontrada para os filtros selecionados.")
-            else:
-                total_os = len(df_os_filtered)
-                abertas = len(df_os_filtered[df_os_filtered["Status"] == "Em Aberto"])
-                andamento = len(df_os_filtered[df_os_filtered["Status"] == "Em Andamento"])
-                finalizadas = len(df_os_filtered[df_os_filtered["Status"] == "Finalizada"])
-                
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total de O.S.", total_os)
-                m2.metric("Em Aberto 🟠", abertas)
-                m3.metric("Em Andamento 🔵", andamento)
-                m4.metric("Finalizadas 🟢", finalizadas)
-                
-                st.markdown("---")
-                
-                col_g1, col_g2 = st.columns(2)
-                
-                with col_g1:
-                    fig_status = px.pie(
-                        df_os_filtered, 
-                        names="Status", 
-                        title="<b>Distribuição por Status</b>",
-                        hole=0.55,
-                        color_discrete_sequence=px.colors.qualitative.Bold
-                    )
-                    fig_status.update_traces(textposition='inside', textinfo='percent+label')
-                    fig_status.update_layout(**layout_transparente)
-                    st.plotly_chart(fig_status, use_container_width=True)
-                
-                with col_g2:
-                    fig_prio = px.histogram(
-                        df_os_filtered, 
-                        y="Prioridade", 
-                        color="Status", 
-                        title="<b>Volume por Prioridade e Status</b>",
-                        orientation="h",
-                        color_discrete_sequence=px.colors.qualitative.Pastel
-                    )
-                    fig_prio.update_layout(**layout_transparente)
-                    fig_prio.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
-                    st.plotly_chart(fig_prio, use_container_width=True)
-
-                col_g3, col_g4 = st.columns(2)
-
-                with col_g3:
-                    df_setor_cnt = df_os_filtered["Setor"].value_counts().reset_index()
-                    df_setor_cnt.columns = ["Setor", "Qtd"]
-                    fig_setor = px.bar(
-                        df_setor_cnt, 
-                        x="Setor", 
-                        y="Qtd", 
-                        title="<b>Total de O.S. por Setor</b>",
-                        color="Qtd",
-                        color_continuous_scale="Viridis"
-                    )
-                    fig_setor.update_layout(**layout_transparente)
-                    fig_setor.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
-                    st.plotly_chart(fig_setor, use_container_width=True)
-
-                with col_g4:
-                    df_solic_cnt = df_os_filtered["Solicitante"].value_counts().head(7).reset_index()
-                    df_solic_cnt.columns = ["Solicitante", "Qtd"]
-                    fig_solic = px.bar(
-                        df_solic_cnt, 
-                        x="Qtd", 
-                        y="Solicitante", 
-                        title="<b>Top 7 Solicitantes de O.S.</b>",
-                        orientation="h",
-                        color="Qtd",
-                        color_continuous_scale="Cividis"
-                    )
-                    fig_solic.update_layout(**layout_transparente)
-                    fig_solic.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
-                    st.plotly_chart(fig_solic, use_container_width=True)
-
-        with tab_dash2:
-            if df_c_filtered.empty:
-                st.info("Nenhuma solicitação de compra encontrada para os filtros selecionados.")
-            else:
-                total_c = len(df_c_filtered)
-                c_abertas = len(df_c_filtered[df_c_filtered["Status"].str.contains("Aberta", case=False, na=False)])
-                c_realizadas = len(df_c_filtered[df_c_filtered["Status"].str.contains("Realizada", case=False, na=False)])
-                c_recusadas = len(df_c_filtered[df_c_filtered["Status"].str.contains("Recusada", case=False, na=False)])
-
-                cm1, cm2, cm3, cm4 = st.columns(4)
-                cm1.metric("Total de Pedidos", total_c)
-                cm2.metric("Em Aberta 🟠", c_abertas)
-                cm3.metric("Realizadas 🟢", c_realizadas)
-                cm4.metric("Recusadas 🔴", c_recusadas)
-
-                st.markdown("---")
-
-                cg1, cg2 = st.columns(2)
-
-                with cg1:
-                    fig_c_status = px.pie(
-                        df_c_filtered, 
-                        names="Status", 
-                        title="<b>Status das Compras</b>",
-                        hole=0.5,
-                        color_discrete_sequence=px.colors.qualitative.Safe
-                    )
-                    fig_c_status.update_traces(textposition='inside', textinfo='percent+label')
-                    fig_c_status.update_layout(**layout_transparente)
-                    st.plotly_chart(fig_c_status, use_container_width=True)
-
-                with cg2:
-                    df_cat_cnt = df_c_filtered["Categoria"].value_counts().reset_index()
-                    df_cat_cnt.columns = ["Categoria", "Qtd"]
-                    fig_cat = px.bar(
-                        df_cat_cnt, 
-                        x="Categoria", 
-                        y="Qtd", 
-                        title="<b>Itens Solicitados por Categoria</b>",
-                        color="Qtd",
-                        color_continuous_scale="Magma"
-                    )
-                    fig_cat.update_layout(**layout_transparente)
-                    fig_cat.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.1)")
-                    st.plotly_chart(fig_cat, use_container_width=True)
