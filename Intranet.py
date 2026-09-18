@@ -1527,4 +1527,255 @@ os.makedirs("uploads_assinaturas", exist_ok=True)
 icone_path = "icone.ico" if os.path.exists("icone.ico") else ("logo.png" if os.path.exists("logo.png") else "🔧")
 st.set_page_config(
     page_title="Intranet Stang - Gestão e Manutenção",
-    page_icon=icone_
+    page_icon=icone_path,
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- AUTO-REFRESH / LOOPING A CADA 3 SEGUNDOS ---
+components.html("""
+    <script>
+        setInterval(function(){
+            window.location.reload();
+        }, 3000);
+    </script>
+""", height=0)
+
+hide_streamlit_style = """
+    <style>
+    </style>
+    """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# Lista completa de menus disponíveis no sistema
+TODOS_MENUS = [
+    "📝 Nova O.S.", 
+    "📋 Gerenciar O.S.", 
+    "🖨️ Imprimir O.S.", 
+    "📅 Formulários e Prazos (FMs)",
+    "🛒 Solicitações de Compras",
+    "📊 Dashboard"
+]
+
+# --- ESTILIZAÇÃO CSS PROFISSIONAL & SUPORTE A TEMAS (CLARO/ESCURO) ---
+background_css = ""
+if os.path.exists("capa.png"):
+    with open("capa.png", "rb") as img_file:
+        encoded_string = base64.b64encode(img_file.read()).decode()
+    background_css = f"""
+    <style>
+        .stApp {{
+            background: linear-gradient(rgba(0, 30, 80, 0.85), rgba(0, 15, 40, 0.90)), 
+                        url("data:image/png;base64,{encoded_string}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+        .stTextInput input, .stSelectbox select, .stTextArea textarea {{
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            color: #000000 !important;
+            font-weight: 500;
+        }}
+        .stDataFrame {{
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 5px;
+        }}
+        div[data-testid="stMetricValue"] {{
+            color: #00ffcc !important;
+        }}
+        
+        /* CARDS COMPACTOS DE STATUS (ESTILO POWER BI / MODERN BADGES) */
+        .status-card-container {{
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }}
+        .status-card {{
+            flex: 1;
+            min-width: 140px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 14px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }}
+        .status-card:hover {{
+            border-color: rgba(0, 255, 204, 0.4);
+            transform: translateY(-2px);
+        }}
+        .status-card-title {{
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }}
+        .status-card-value {{
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .badge-success {{ color: #00ffaa; }}
+        .badge-danger {{ color: #ff4b4b; }}
+        .badge-warning {{ color: #ffb703; }}
+        
+        /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) COM SUPORTE A TEMA */
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
+            gap: 8px;
+        }}
+        [data-testid="stSidebar"] .stRadio label {{
+            background-color: rgba(255, 255, 255, 0.08);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            width: 100%;
+            display: flex;
+            align-items: center;
+        }}
+        [data-testid="stSidebar"] .stRadio label:hover {{
+            background-color: rgba(255, 255, 255, 0.2);
+        }}
+
+        /* REGRAS PARA IMPRESSÃO LIMPA */
+        @media print {{
+            body {{
+                background: #ffffff !important;
+                color: #000000 !important;
+            }}
+            .stApp {{
+                background: #ffffff !important;
+            }}
+            [data-testid="stSidebar"], header, footer, .stButton, .stSelectbox, .no-print {{
+                display: none !important;
+            }}
+        }}
+    </style>
+    """
+st.markdown(background_css, unsafe_allow_html=True)
+
+# Bancos de Dados locais CSV
+ARQUIVO_OS = "banco_os.csv"
+ARQUIVO_FMS = "banco_fms.csv"
+ARQUIVO_USERS = "banco_usuarios.csv"
+ARQUIVO_COMPRAS = "banco_compras.csv"
+
+def inicializar_bancos():
+    colunas_os = [
+        "ID", "Data_Criacao", "Solicitante", "Setor", "Equipamento", 
+        "Tipo_Manutencao", "Prioridade", "Descricao", "Solucao", 
+        "Itens_Trocados", "finalizado_por", "Data_Termino", "Status"
+    ]
+    if not os.path.exists(ARQUIVO_OS):
+        pd.DataFrame(columns=colunas_os).to_csv(ARQUIVO_OS, index=False)
+    else:
+        df = pd.read_csv(ARQUIVO_OS, dtype=str)
+        mudou = False
+        if "Responsavel_Servico" in df.columns and "finalizado_por" not in df.columns:
+            df["finalizado_por"] = df["Responsavel_Servico"]
+            mudou = True
+        if "Finalizado_Por" in df.columns and "finalizado_por" not in df.columns:
+            df["finalizado_por"] = df["Finalizado_Por"]
+            mudou = True
+        for col in colunas_os:
+            if col not in df.columns:
+                df[col] = ""
+                mudou = True
+        if mudou:
+            df.to_csv(ARQUIVO_OS, index=False)
+        
+    if not os.path.exists(ARQUIVO_FMS):
+        pd.DataFrame(columns=["FM", "Data_Realizada", "Periodo", "Dias_Prazo"]).to_csv(ARQUIVO_FMS, index=False)
+        
+    colunas_compras = [
+        "ID_Compra", "Data_Solicitacao", "Solicitante", "Setor", "Categoria", 
+        "Item", "Quantidade", "Observacoes", "Status", "Orcamento_Assinado",
+        "NF_Anexada", "Boleto_Anexado", "Assinado_Por"
+    ]
+    if not os.path.exists(ARQUIVO_COMPRAS):
+        pd.DataFrame(columns=colunas_compras).to_csv(ARQUIVO_COMPRAS, index=False)
+    else:
+        df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+        mudou_c = False
+        for col in colunas_compras:
+            if col not in df_c.columns:
+                df_c[col] = "None" if col in ["Orcamento_Assinado", "NF_Anexada", "Boleto_Anexado", "Assinado_Por"] else ""
+                mudou_c = True
+        if mudou_c:
+            df_c.to_csv(ARQUIVO_COMPRAS, index=False)
+        
+    todos_menus_str = ",".join(TODOS_MENUS)
+    colunas_users = [
+        "Usuario", "Senha", "Validade", "Permissoes", "Admin", "Assinatura_PNG", 
+        "Email_Usuario", "Senha_App_Email", "Servidor_SMTP", "Porta_SMTP"
+    ]
+    
+    if not os.path.exists(ARQUIVO_USERS):
+        df_users = pd.DataFrame([{
+            "Usuario": "thiagosc",
+            "Senha": "stang2026",
+            "Validade": "Vitalício",
+            "Permissoes": todos_menus_str,
+            "Admin": "Sim",
+            "Assinatura_PNG": "None",
+            "Email_Usuario": "thiagosc@stang.com.br",
+            "Senha_App_Email": "",
+            "Servidor_SMTP": "smtp.gmail.com",
+            "Porta_SMTP": "587"
+        }])
+        df_users.to_csv(ARQUIVO_USERS, index=False)
+    else:
+        df_users = pd.read_csv(ARQUIVO_USERS, dtype=str)
+        mudou_u = False
+        for col in colunas_users:
+            if col not in df_users.columns:
+                if col in ["Assinatura_PNG"]:
+                    df_users[col] = "None"
+                elif col == "Servidor_SMTP":
+                    df_users[col] = "smtp.gmail.com"
+                elif col == "Porta_SMTP":
+                    df_users[col] = "587"
+                else:
+                    df_users[col] = ""
+                mudou_u = True
+        if mudou_u:
+            df_users.to_csv(ARQUIVO_USERS, index=False)
+            
+        if "thiagosc" not in df_users["Usuario"].str.lower().values:
+            novo_mestre = pd.DataFrame([{
+                "Usuario": "thiagosc",
+                "Senha": "stang2026",
+                "Validade": "Vitalício",
+                "Permissoes": todos_menus_str,
+                "Admin": "Sim",
+                "Assinatura_PNG": "None",
+                "Email_Usuario": "thiagosc@stang.com.br",
+                "Senha_App_Email": "",
+                "Servidor_SMTP": "smtp.gmail.com",
+                "Porta_SMTP": "587"
+            }])
+            df_users = pd.concat([df_users, novo_mestre], ignore_index=True)
+            df_users.to_csv(ARQUIVO_USERS, index=False)
+
+inicializar_bancos()
+
+def carregar_banco_os():
+    if not os.path.exists(ARQUIVO_OS):
+        inicializar_bancos()
+    df = pd.read_csv(ARQUIVO_OS, dtype=str)
+    if "ID" in df.columns:
+        df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
+    return df
+
+# Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64)
+def exibir_documento(caminho_arquivo, titulo):
+    if pd.isna(caminho_arquivo) or str(caminho_arquivo).strip() in ["None", ""]:
+        st.warning(f"📄 **{titulo}:** Não anexado.")
+        return
+    if not os.path.exists(str(caminho_arquivo)):
