@@ -486,6 +486,247 @@ def gerar_pdf_os(os_row):
     buffer.seek(0)
     return buffer.getvalue()
 
+# --- RELATÓRIO GERAL DE O.S.: PDF E HTML PARA IMPRESSÃO ---
+def gerar_pdf_relatorio_os(df_rel):
+    """Gera um relatório geral de O.S. em PDF usando os registros já filtrados."""
+    if not HAS_PDF_LIBS:
+        return None
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=__import__("reportlab.lib.pagesizes", fromlist=["landscape"]).landscape(letter),
+        rightMargin=24,
+        leftMargin=24,
+        topMargin=28,
+        bottomMargin=28
+    )
+
+    styles = getSampleStyleSheet()
+    titulo = ParagraphStyle(
+        "RelTitulo",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=14,
+        alignment=1,
+        spaceAfter=6
+    )
+    subtitulo = ParagraphStyle(
+        "RelSubtitulo",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        alignment=1,
+        textColor=colors.HexColor("#444444"),
+        spaceAfter=8
+    )
+    cab = ParagraphStyle(
+        "RelCab",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        alignment=1,
+        leading=8
+    )
+    cel = ParagraphStyle(
+        "RelCel",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=6.5,
+        leading=7.5
+    )
+    celc = ParagraphStyle(
+        "RelCelC",
+        parent=cel,
+        alignment=1
+    )
+
+    def esc(v):
+        if pd.isna(v):
+            return ""
+        return htmlmod.escape(str(v)).replace("\n", "<br/>")
+
+    elements = [
+        Paragraph("STANG - RELATÓRIO GERAL DE ORDENS DE SERVIÇO", titulo),
+        Paragraph(
+            f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} | Total de O.S.: {len(df_rel)}",
+            subtitulo
+        )
+    ]
+
+    colunas = [
+        ("ID", 34), ("Data", 64), ("Solicitante", 78), ("Setor", 60),
+        ("Equipamento", 85), ("Tipo", 58), ("Prioridade", 54),
+        ("Status", 62), ("Executante", 85)
+    ]
+    header = [Paragraph(htmlmod.escape(t), cab) for t, _ in colunas]
+    tabela_data = [header]
+
+    for _, row in df_rel.iterrows():
+        tabela_data.append([
+            Paragraph(esc(row.get("ID", "")), celc),
+            Paragraph(esc(row.get("Data_Criacao", "")), celc),
+            Paragraph(esc(row.get("Solicitante", "")), cel),
+            Paragraph(esc(row.get("Setor", "")), cel),
+            Paragraph(esc(row.get("Equipamento", "")), cel),
+            Paragraph(esc(row.get("Tipo_Manutencao", "")), celc),
+            Paragraph(esc(row.get("Prioridade", "")), celc),
+            Paragraph(esc(row.get("Status", "")), celc),
+            Paragraph(esc(row.get("finalizado_por", "")), cel)
+        ])
+
+    tabela = RLTable(
+        tabela_data,
+        colWidths=[w for _, w in colunas],
+        repeatRows=1,
+        splitByRow=1
+    )
+    tabela.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.7, colors.black),
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#B8B8B8")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E6E6E6")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(tabela)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def gerar_html_relatorio_os_impressao(df_rel, filtros_descricao="Sem filtros"):
+    """Monta uma página HTML limpa para impressão do relatório geral de O.S."""
+    colunas = [
+        ("ID", "ID"),
+        ("Data", "Data_Criacao"),
+        ("Solicitante", "Solicitante"),
+        ("Setor", "Setor"),
+        ("Equipamento", "Equipamento"),
+        ("Tipo", "Tipo_Manutencao"),
+        ("Prioridade", "Prioridade"),
+        ("Status", "Status"),
+        ("Executante", "finalizado_por")
+    ]
+
+    linhas_html = []
+    for _, row in df_rel.iterrows():
+        celulas = []
+        for _, campo in colunas:
+            valor = "" if pd.isna(row.get(campo, "")) else str(row.get(campo, ""))
+            celulas.append(f"<td>{htmlmod.escape(valor).replace(chr(10), '<br>')}</td>")
+        linhas_html.append("<tr>" + "".join(celulas) + "</tr>")
+
+    if not linhas_html:
+        linhas_html.append(
+            "<tr><td colspan='9' style='text-align:center;'>Nenhuma O.S. encontrada para impressão.</td></tr>"
+        )
+
+    cabecalhos = "".join(f"<th>{htmlmod.escape(titulo)}</th>" for titulo, _ in colunas)
+
+    return f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório Geral de O.S.</title>
+<style>
+    * {{ box-sizing: border-box; }}
+    body {{
+        margin: 0;
+        padding: 16px;
+        background: #ffffff;
+        color: #000000;
+        font-family: Arial, Helvetica, sans-serif;
+    }}
+    .toolbar {{
+        display:flex;
+        gap:10px;
+        align-items:center;
+        justify-content:center;
+        margin-bottom:14px;
+    }}
+    .btn {{
+        border:0;
+        border-radius:6px;
+        padding:10px 18px;
+        font-size:14px;
+        font-weight:700;
+        cursor:pointer;
+        background:#111111;
+        color:#ffffff;
+    }}
+    .cabecalho {{
+        border:1.5px solid #000;
+        padding:12px;
+        margin-bottom:10px;
+    }}
+    .titulo {{
+        text-align:center;
+        font-size:18px;
+        font-weight:800;
+        margin-bottom:4px;
+    }}
+    .meta {{
+        text-align:center;
+        font-size:11px;
+        margin-top:3px;
+    }}
+    .resumo {{
+        font-size:11px;
+        margin:8px 0 10px;
+    }}
+    table {{
+        width:100%;
+        border-collapse:collapse;
+        font-size:9px;
+        table-layout:fixed;
+    }}
+    th, td {{
+        border:1px solid #000;
+        padding:5px 4px;
+        vertical-align:top;
+        word-break:break-word;
+    }}
+    th {{
+        background:#e6e6e6;
+        text-align:center;
+    }}
+    tr {{ page-break-inside:avoid; }}
+    @media print {{
+        @page {{ size: landscape; margin: 8mm; }}
+        body {{ padding:0; }}
+        .toolbar {{ display:none !important; }}
+        .cabecalho {{ border:1px solid #000; }}
+        table {{ font-size:8px; }}
+        th, td {{ padding:4px 3px; }}
+    }}
+</style>
+</head>
+<body>
+    <div class="toolbar">
+        <button class="btn" onclick="window.print()">🖨️ Imprimir Relatório Geral</button>
+    </div>
+
+    <div class="cabecalho">
+        <div class="titulo">STANG - RELATÓRIO GERAL DE ORDENS DE SERVIÇO</div>
+        <div class="meta">Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} | Total de O.S.: {len(df_rel)}</div>
+        <div class="meta">Filtros aplicados: {htmlmod.escape(str(filtros_descricao))}</div>
+    </div>
+
+    <div class="resumo"><b>Registros apresentados:</b> {len(df_rel)}</div>
+
+    <table>
+        <thead><tr>{cabecalhos}</tr></thead>
+        <tbody>{''.join(linhas_html)}</tbody>
+    </table>
+</body>
+</html>
+"""
 # --- FUNÇÃO PARA GERAR O HTML COMPLETO DA OS DA IMPRESSÃO ---
 def gerar_html_os_impressao(os_row):
     equipamento_val = os_row['Equipamento'] if pd.notna(os_row.get('Equipamento')) else 'N/A'
@@ -1325,69 +1566,144 @@ if menu is not None:
                                     else:
                                         st.error(f"Erro ao enviar e-mail: {msg_send}")
 
-    # --- TELA 3: IMPRIMIR O.S. ---
+    # --- TELA 3: EMISSÃO E RELATÓRIOS DE O.S. ---
     elif menu == "🖨️ Imprimir O.S.":
         st.markdown("# 🖨️ Emissão e Relatórios de O.S.")
         df = carregar_banco_os()
-        
+
         if df.empty:
             st.warning("Não há O.S. cadastradas para impressão.")
         else:
             tab_imp1, tab_imp2 = st.tabs(["📄 Imprimir O.S.", "📊 Relatório Geral de O.S."])
-            
+
             with tab_imp1:
-                lista_os = df["ID"].astype(str) + " - " + df["Solicitante"] + " (" + df["Setor"] + ")"
+                lista_os = (
+                    df["ID"].astype(str) + " - " +
+                    df["Solicitante"].astype(str) + " (" +
+                    df["Setor"].astype(str) + ")"
+                )
                 os_selecionada = st.selectbox("Selecione a O.S. desejada:", lista_os)
-                
-                id_selecionado = int(os_selecionada.split(" - ")[0])
+
+                id_selecionado = int(str(os_selecionada).split(" - ")[0])
                 os_row = df[df["ID"] == id_selecionado].iloc[0]
-                
+
                 st.markdown("---")
-                
                 print_html = gerar_html_os_impressao(os_row)
                 components.html(print_html, height=920, scrolling=True)
 
             with tab_imp2:
                 st.subheader("Filtros para o Relatório de Ordens de Serviço (O.S.)")
+
                 df_rel_os = df.copy()
-                df_rel_os['Dt_Parsed'] = pd.to_datetime(df_rel_os['Data_Criacao'], format='%d/%m/%Y %H:%M', errors='coerce')
-                if df_rel_os['Dt_Parsed'].isna().all():
-                    df_rel_os['Dt_Parsed'] = pd.to_datetime(df_rel_os['Data_Criacao'], errors='coerce')
-                
-                df_rel_os['Ano'] = df_rel_os['Dt_Parsed'].dt.year
-                df_rel_os['Mes_Ano'] = df_rel_os['Dt_Parsed'].dt.strftime('%m/%Y')
-                df_rel_os['Dia'] = df_rel_os['Dt_Parsed'].dt.date
-                
+                df_rel_os["Dt_Parsed"] = pd.to_datetime(
+                    df_rel_os["Data_Criacao"],
+                    format="%d/%m/%Y %H:%M",
+                    errors="coerce",
+                    dayfirst=True
+                )
+                if df_rel_os["Dt_Parsed"].isna().all():
+                    df_rel_os["Dt_Parsed"] = pd.to_datetime(
+                        df_rel_os["Data_Criacao"],
+                        errors="coerce",
+                        dayfirst=True
+                    )
+
+                df_rel_os["Ano"] = df_rel_os["Dt_Parsed"].dt.year
+                df_rel_os["Mes"] = df_rel_os["Dt_Parsed"].dt.month
+                df_rel_os["Dia"] = df_rel_os["Dt_Parsed"].dt.day
+                df_rel_os["Mes_Ano"] = df_rel_os["Dt_Parsed"].dt.strftime("%m/%Y")
+
                 col_f1, col_f2, col_f3, col_f4 = st.columns(4)
                 with col_f1:
-                    status_opts = ["Todos"] + sorted(df_rel_os['Status'].dropna().unique().tolist())
+                    status_opts = ["Todos"] + sorted(
+                        [str(x) for x in df_rel_os["Status"].dropna().unique() if str(x).strip()]
+                    )
                     filtro_status_rep = st.selectbox("Status", status_opts, key="rep_status")
                 with col_f2:
-                    anos_opts = ["Todos"] + sorted([str(int(a)) for a in df_rel_os['Ano'].dropna().unique() if pd.notna(a)])
+                    anos_opts = ["Todos"] + sorted(
+                        [str(int(a)) for a in df_rel_os["Ano"].dropna().unique()],
+                        reverse=True
+                    )
                     filtro_ano_rep = st.selectbox("Ano", anos_opts, key="rep_ano")
                 with col_f3:
-                    meses_opts = ["Todos"] + sorted(df_rel_os['Mes_Ano'].dropna().unique().tolist())
+                    meses_opts = ["Todos"] + sorted(
+                        [str(x) for x in df_rel_os["Mes_Ano"].dropna().unique()],
+                        reverse=True
+                    )
                     filtro_mes_rep = st.selectbox("Mês/Ano", meses_opts, key="rep_mes")
                 with col_f4:
-                    dias_opts = ["Todos"] + sorted(df_rel_os['Dia'].astype(str).dropna().unique().tolist())
+                    dias_opts = ["Todos"] + sorted(
+                        [str(x) for x in df_rel_os["Dt_Parsed"].dropna().dt.strftime("%d/%m/%Y").unique()],
+                        reverse=True
+                    )
                     filtro_dia_rep = st.selectbox("Dia Exato", dias_opts, key="rep_dia")
-                
+
                 df_f_rep = df_rel_os.copy()
                 if filtro_status_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Status'] == filtro_status_rep]
+                    df_f_rep = df_f_rep[df_f_rep["Status"].astype(str) == filtro_status_rep]
                 if filtro_ano_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Ano'].astype(str) == filtro_ano_rep]
+                    df_f_rep = df_f_rep[df_f_rep["Ano"].astype("Int64").astype(str) == filtro_ano_rep]
                 if filtro_mes_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Mes_Ano'] == filtro_mes_rep]
+                    df_f_rep = df_f_rep[df_f_rep["Mes_Ano"].astype(str) == filtro_mes_rep]
                 if filtro_dia_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Dia'].astype(str) == filtro_dia_rep]
-                
+                    df_f_rep = df_f_rep[
+                        df_f_rep["Dt_Parsed"].dt.strftime("%d/%m/%Y") == filtro_dia_rep
+                    ]
+
                 st.markdown("---")
                 st.markdown(f"**Total de O.S. encontradas:** {len(df_f_rep)}")
-                
-                if not df_f_rep.empty:
-                    st.dataframe(df_f_rep[["ID", "Data_Criacao", "Solicitante", "Setor", "Equipamento", "Tipo_Manutencao", "Prioridade", "Status", "Solucao", "finalizado_por"]], use_container_width=True)
 
+                filtros_desc = (
+                    f"Status={filtro_status_rep}; Ano={filtro_ano_rep}; "
+                    f"Mês/Ano={filtro_mes_rep}; Dia={filtro_dia_rep}"
+                )
+
+                if not df_f_rep.empty:
+                    col_rel1, col_rel2 = st.columns(2)
+
+                    with col_rel1:
+                        pdf_rel_geral = gerar_pdf_relatorio_os(df_f_rep)
+                        if pdf_rel_geral:
+                            st.download_button(
+                                "📥 Baixar PDF do Relatório Geral",
+                                data=pdf_rel_geral,
+                                file_name=f"Relatorio_Geral_OS_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
+                        else:
+                            st.warning("Bibliotecas de PDF não disponíveis. A impressão pelo navegador continua disponível.")
+
+                    with col_rel2:
+                        st.markdown(
+                            """
+                            <div style="padding-top:28px;">
+                                <b>🖨️ Impressão:</b> use o botão abaixo no painel de impressão.
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                    st.dataframe(
+                        df_f_rep[
+                            [
+                                "ID", "Data_Criacao", "Solicitante", "Setor",
+                                "Equipamento", "Tipo_Manutencao", "Prioridade",
+                                "Status", "Solucao", "finalizado_por"
+                            ]
+                        ].sort_values(by="ID", ascending=False),
+                        use_container_width=True,
+                        height=420
+                    )
+
+                    st.markdown("#### 🖨️ Visualização para Impressão")
+                    print_rel_html = gerar_html_relatorio_os_impressao(
+                        df_f_rep,
+                        filtros_descricao=filtros_desc
+                    )
+                    components.html(print_rel_html, height=820, scrolling=True)
+                else:
+                    st.info("Nenhuma O.S. encontrada para os filtros selecionados.")
     # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---
     elif menu == "📅 Formulários e Prazos (FMs)":
         st.markdown("# 📅 Gestão de Conformidade de Formulários (FMs)")
@@ -1481,16 +1797,116 @@ if menu is not None:
         with tab_fm3:
             st.subheader("Painel de Prazos e Status dos FMs")
             df_fms = pd.read_csv(ARQUIVO_FMS, dtype=str)
+
             if not df_fms.empty:
                 hoje = datetime.now().date()
-                df_fms['Data_Realizada'] = pd.to_datetime(df_fms['Data_Realizada']).dt.date
-                df_fms['Dias_Prazo_int'] = pd.to_numeric(df_fms['Dias_Prazo'], errors='coerce').fillna(0).astype(int)
-                df_fms['Vencimento'] = df_fms.apply(lambda row: row['Data_Realizada'] + timedelta(days=int(row['Dias_Prazo_int'])), axis=1)
-                df_fms['Dias_Restantes'] = df_fms['Vencimento'].apply(lambda x: (x - hoje).days)
-                df_fms['Status'] = df_fms['Dias_Restantes'].apply(lambda x: "Atrasado 🔴" if x < 0 else "No Prazo 🟢")
-                
-                st.dataframe(df_fms[["FM", "Data_Realizada", "Periodo", "Vencimento", "Dias_Restantes", "Status"]], use_container_width=True)
 
+                df_fms["Data_Realizada"] = pd.to_datetime(
+                    df_fms["Data_Realizada"],
+                    errors="coerce",
+                    dayfirst=True
+                ).dt.date
+
+                df_fms["Dias_Prazo_int"] = pd.to_numeric(
+                    df_fms["Dias_Prazo"],
+                    errors="coerce"
+                ).fillna(0).astype(int)
+
+                df_fms["Vencimento"] = df_fms.apply(
+                    lambda row: (
+                        row["Data_Realizada"] + timedelta(days=int(row["Dias_Prazo_int"]))
+                        if pd.notna(row["Data_Realizada"]) else hoje
+                    ),
+                    axis=1
+                )
+                df_fms["Dias_Restantes"] = df_fms["Vencimento"].apply(
+                    lambda x: (x - hoje).days
+                )
+                df_fms["Status"] = df_fms["Dias_Restantes"].apply(
+                    lambda x: "Atrasado 🔴" if x < 0 else "No Prazo 🟢"
+                )
+
+                st.dataframe(
+                    df_fms[
+                        [
+                            "FM", "Data_Realizada", "Periodo",
+                            "Vencimento", "Dias_Restantes", "Status"
+                        ]
+                    ],
+                    use_container_width=True
+                )
+
+                st.markdown("### 📊 Comparativo de Prazo × Dias Restantes por FM")
+
+                df_graf_fm = df_fms[
+                    ["FM", "Dias_Prazo_int", "Dias_Restantes", "Status"]
+                ].copy()
+
+                df_graf_fm["Dias_Restantes_Grafico"] = df_graf_fm["Dias_Restantes"]
+                df_graf_fm["FM"] = df_graf_fm["FM"].astype(str)
+
+                fig_fm = go.Figure()
+                fig_fm.add_trace(
+                    go.Bar(
+                        y=df_graf_fm["FM"],
+                        x=df_graf_fm["Dias_Prazo_int"],
+                        name="Prazo total (dias)",
+                        orientation="h",
+                        text=df_graf_fm["Dias_Prazo_int"],
+                        textposition="auto",
+                        marker=dict(
+                            line=dict(width=0),
+                            opacity=0.82
+                        )
+                    )
+                )
+                fig_fm.add_trace(
+                    go.Bar(
+                        y=df_graf_fm["FM"],
+                        x=df_graf_fm["Dias_Restantes_Grafico"],
+                        name="Dias restantes",
+                        orientation="h",
+                        text=df_graf_fm["Dias_Restantes_Grafico"],
+                        textposition="auto",
+                        marker=dict(
+                            line=dict(width=0),
+                            opacity=0.82
+                        )
+                    )
+                )
+                fig_fm.add_vline(x=0, line_width=1)
+                fig_fm.update_layout(
+                    barmode="group",
+                    height=max(360, 48 * len(df_graf_fm)),
+                    margin=dict(l=10, r=10, t=35, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    xaxis=dict(
+                        title="Dias",
+                        showgrid=False,
+                        zeroline=False
+                    ),
+                    yaxis=dict(
+                        title="",
+                        showgrid=False,
+                        autorange="reversed"
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="left",
+                        x=0
+                    )
+                )
+
+                st.plotly_chart(
+                    fig_fm,
+                    use_container_width=True,
+                    config={"displaylogo": False}
+                )
+            else:
+                st.info("Nenhum FM cadastrado.")
     # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---
     elif menu == "🛒 Solicitações de Compras":
         st.markdown("# 🛒 Solicitações de Materiais e Insumos")
@@ -2083,3 +2499,324 @@ if menu is not None:
                         exibir_documento(row_base_ass.get("NF_Anexada", "None"), "Nota Fiscal")
                     with c_doc3:
                         exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
+    # --- TELA 6: DASHBOARD ---
+    elif menu == "📊 Dashboard":
+        st.markdown("# 📊 Dashboard Gerencial")
+        st.caption("Filtros globais aplicados às janelas de Compras e O.S.")
+
+        # Carregamento independente das duas bases para não alterar a área de Compras.
+        df_dash_os = carregar_banco_os()
+        df_dash_comp = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+
+        def _parse_data_dashboard(serie):
+            return pd.to_datetime(
+                serie.astype(str),
+                errors="coerce",
+                dayfirst=True
+            )
+
+        if not df_dash_os.empty:
+            df_dash_os["Data_Dashboard"] = _parse_data_dashboard(df_dash_os["Data_Criacao"])
+        else:
+            df_dash_os["Data_Dashboard"] = pd.Series(dtype="datetime64[ns]")
+
+        if not df_dash_comp.empty:
+            df_dash_comp["Data_Dashboard"] = _parse_data_dashboard(df_dash_comp["Data_Solicitacao"])
+        else:
+            df_dash_comp["Data_Dashboard"] = pd.Series(dtype="datetime64[ns]")
+
+        anos = set()
+        meses = set()
+        dias = set()
+
+        for base in (df_dash_os, df_dash_comp):
+            datas_validas = base["Data_Dashboard"].dropna()
+            anos.update(datas_validas.dt.year.astype(int).tolist())
+            meses.update(datas_validas.dt.month.astype(int).tolist())
+            dias.update(datas_validas.dt.day.astype(int).tolist())
+
+        MESES_PT = {
+            1: "01 - Janeiro", 2: "02 - Fevereiro", 3: "03 - Março",
+            4: "04 - Abril", 5: "05 - Maio", 6: "06 - Junho",
+            7: "07 - Julho", 8: "08 - Agosto", 9: "09 - Setembro",
+            10: "10 - Outubro", 11: "11 - Novembro", 12: "12 - Dezembro"
+        }
+
+        col_g1, col_g2, col_g3 = st.columns(3)
+
+        with col_g1:
+            filtro_ano_dash = st.selectbox(
+                "📅 Ano",
+                ["Todos"] + [str(a) for a in sorted(anos, reverse=True)],
+                key="dash_ano"
+            )
+
+        with col_g2:
+            mes_opts_dash = ["Todos"] + [
+                MESES_PT[m] for m in sorted(meses)
+                if m in MESES_PT
+            ]
+            filtro_mes_dash = st.selectbox(
+                "🗓️ Mês",
+                mes_opts_dash,
+                key="dash_mes"
+            )
+
+        with col_g3:
+            filtro_dia_dash = st.selectbox(
+                "🔢 Dia",
+                ["Todos"] + [str(d) for d in sorted(dias)],
+                key="dash_dia"
+            )
+
+        def _aplicar_filtros_globais(df):
+            base = df.copy()
+            if base.empty:
+                return base
+
+            if filtro_ano_dash != "Todos":
+                base = base[
+                    base["Data_Dashboard"].dt.year.fillna(-1).astype(int)
+                    == int(filtro_ano_dash)
+                ]
+
+            if filtro_mes_dash != "Todos":
+                mes_num = int(filtro_mes_dash.split(" - ")[0])
+                base = base[
+                    base["Data_Dashboard"].dt.month.fillna(-1).astype(int)
+                    == mes_num
+                ]
+
+            if filtro_dia_dash != "Todos":
+                base = base[
+                    base["Data_Dashboard"].dt.day.fillna(-1).astype(int)
+                    == int(filtro_dia_dash)
+                ]
+            return base
+
+        df_dash_os_f = _aplicar_filtros_globais(df_dash_os)
+        df_dash_comp_f = _aplicar_filtros_globais(df_dash_comp)
+
+        # Estilo Power BI: gráficos sem fundo.
+        def _layout_fig(fig, altura=360, legenda=True):
+            fig.update_layout(
+                height=altura,
+                margin=dict(l=10, r=10, t=55, b=15),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(size=11),
+                showlegend=legenda,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0
+                )
+            )
+            return fig
+
+        # JANELA 1 — O.S.
+        aba_dash_os, aba_dash_comp = st.tabs([
+            "🔧 Setor O.S.",
+            "🛒 Setor Compras"
+        ])
+
+        with aba_dash_os:
+            st.markdown("### 🔧 Indicadores de Ordens de Serviço")
+
+            k1, k2, k3, k4 = st.columns(4)
+            total_os = len(df_dash_os_f)
+            finalizadas_os = (
+                df_dash_os_f["Status"].astype(str).str.contains("Finalizada", case=False, na=False).sum()
+                if not df_dash_os_f.empty else 0
+            )
+            abertas_os = (
+                df_dash_os_f["Status"].astype(str).str.contains("Em Aberto", case=False, na=False).sum()
+                if not df_dash_os_f.empty else 0
+            )
+            andamento_os = (
+                df_dash_os_f["Status"].astype(str).str.contains("Em Andamento", case=False, na=False).sum()
+                if not df_dash_os_f.empty else 0
+            )
+
+            k1.metric("Total O.S.", total_os)
+            k2.metric("Finalizadas", int(finalizadas_os))
+            k3.metric("Em Andamento", int(andamento_os))
+            k4.metric("Em Aberto", int(abertas_os))
+
+            if df_dash_os_f.empty:
+                st.info("Nenhuma O.S. encontrada para os filtros globais.")
+            else:
+                c_os1, c_os2 = st.columns(2)
+
+                with c_os1:
+                    d_status_os = (
+                        df_dash_os_f.assign(
+                            Status=df_dash_os_f["Status"].fillna("Sem Status").astype(str)
+                        )
+                        .groupby("Status")
+                        .size()
+                        .reset_index(name="Quantidade")
+                    )
+                    fig_os_status = px.pie(
+                        d_status_os,
+                        names="Status",
+                        values="Quantidade",
+                        hole=0.58,
+                        title="O.S. por Status"
+                    )
+                    fig_os_status.update_traces(
+                        textposition="inside",
+                        textinfo="percent+label"
+                    )
+                    st.plotly_chart(
+                        _layout_fig(fig_os_status, altura=380),
+                        use_container_width=True,
+                        config={"displaylogo": False}
+                    )
+
+                with c_os2:
+                    d_setor_os = (
+                        df_dash_os_f.assign(
+                            Setor=df_dash_os_f["Setor"].fillna("Sem Setor").astype(str)
+                        )
+                        .groupby("Setor")
+                        .size()
+                        .reset_index(name="Quantidade")
+                        .sort_values("Quantidade", ascending=True)
+                    )
+                    fig_os_setor = px.bar(
+                        d_setor_os,
+                        x="Quantidade",
+                        y="Setor",
+                        orientation="h",
+                        text="Quantidade",
+                        title="O.S. por Setor"
+                    )
+                    st.plotly_chart(
+                        _layout_fig(fig_os_setor, altura=380, legenda=False),
+                        use_container_width=True,
+                        config={"displaylogo": False}
+                    )
+
+                d_prio_os = (
+                    df_dash_os_f.assign(
+                        Prioridade=df_dash_os_f["Prioridade"].fillna("Sem Prioridade").astype(str)
+                    )
+                    .groupby("Prioridade")
+                    .size()
+                    .reset_index(name="Quantidade")
+                )
+                d_prio_os["Ordem"] = d_prio_os["Prioridade"].map({
+                    "URGENTE": 1, "ALTA": 2, "MÉDIA": 3, "MEDIA": 3, "BAIXA": 4
+                }).fillna(5)
+                d_prio_os = d_prio_os.sort_values("Ordem")
+
+                fig_os_prio = px.bar(
+                    d_prio_os,
+                    x="Prioridade",
+                    y="Quantidade",
+                    text="Quantidade",
+                    title="O.S. por Prioridade"
+                )
+                st.plotly_chart(
+                    _layout_fig(fig_os_prio, altura=360, legenda=False),
+                    use_container_width=True,
+                    config={"displaylogo": False}
+                )
+
+        # JANELA 2 — COMPRAS
+        with aba_dash_comp:
+            st.markdown("### 🛒 Indicadores de Solicitações de Compras")
+
+            def _status_compra_dashboard(valor):
+                v = str(valor).lower()
+                if "realizada" in v:
+                    return "Compra Realizada 🟢"
+                if "recusada" in v:
+                    return "Compra Recusada 🔴"
+                return "Compra em Aberta 🟠"
+
+            k5, k6, k7, k8 = st.columns(4)
+            total_comp = len(df_dash_comp_f)
+            realizadas_comp = (
+                df_dash_comp_f["Status"].apply(_status_compra_dashboard).str.contains("Realizada", na=False).sum()
+                if not df_dash_comp_f.empty else 0
+            )
+            recusadas_comp = (
+                df_dash_comp_f["Status"].apply(_status_compra_dashboard).str.contains("Recusada", na=False).sum()
+                if not df_dash_comp_f.empty else 0
+            )
+            abertas_comp = (
+                df_dash_comp_f["Status"].apply(_status_compra_dashboard).str.contains("Aberta", na=False).sum()
+                if not df_dash_comp_f.empty else 0
+            )
+
+            k5.metric("Total Compras", total_comp)
+            k6.metric("Realizadas", int(realizadas_comp))
+            k7.metric("Em Aberto", int(abertas_comp))
+            k8.metric("Recusadas", int(recusadas_comp))
+
+            if df_dash_comp_f.empty:
+                st.info("Nenhuma solicitação de compra encontrada para os filtros globais.")
+            else:
+                c_cp1, c_cp2 = st.columns(2)
+
+                d_status_cp = (
+                    df_dash_comp_f.assign(
+                        Status_Visual=df_dash_comp_f["Status"].apply(_status_compra_dashboard)
+                    )
+                    .groupby("Status_Visual")
+                    .size()
+                    .reset_index(name="Quantidade")
+                )
+                fig_cp_status = px.pie(
+                    d_status_cp,
+                    names="Status_Visual",
+                    values="Quantidade",
+                    hole=0.58,
+                    title="Compras por Status"
+                )
+                fig_cp_status.update_traces(
+                    textposition="inside",
+                    textinfo="percent+label"
+                )
+
+                with c_cp1:
+                    st.plotly_chart(
+                        _layout_fig(fig_cp_status, altura=380),
+                        use_container_width=True,
+                        config={"displaylogo": False}
+                    )
+
+                d_cat_cp = (
+                    df_dash_comp_f.assign(
+                        Categoria=df_dash_comp_f["Categoria"].fillna("Sem Categoria").astype(str)
+                    )
+                    .groupby("Categoria")
+                    .size()
+                    .reset_index(name="Quantidade")
+                    .sort_values("Quantidade", ascending=True)
+                    .tail(12)
+                )
+                fig_cp_cat = px.bar(
+                    d_cat_cp,
+                    x="Quantidade",
+                    y="Categoria",
+                    orientation="h",
+                    text="Quantidade",
+                    title="Compras por Categoria (até 12)"
+                )
+
+                with c_cp2:
+                    st.plotly_chart(
+                        _layout_fig(fig_cp_cat, altura=380, legenda=False),
+                        use_container_width=True,
+                        config={"displaylogo": False}
+                    )
+
+        st.caption(
+            "Os filtros de Dia, Mês e Ano acima são globais para as duas janelas do Dashboard. "
+            "As áreas de Solicitações de Compras, Painel de Assinaturas e demais painéis existentes não foram alteradas."
+        )
