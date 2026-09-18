@@ -275,16 +275,11 @@ inicializar_bancos()
 def carregar_banco_os():
     if not os.path.exists(ARQUIVO_OS):
         inicializar_bancos()
-    # Adicionar encoding utf-8-sig para preservar acentos corretamente
-    df = pd.read_csv(ARQUIVO_OS, dtype=str, encoding='utf-8-sig')
-    
-    # Substituir strings literais indesejadas por vazios reais
-    df = df.fillna("")
-    df.replace(["nan", "None", "<NA>"], "", inplace=True)
-    
+    df = pd.read_csv(ARQUIVO_OS, dtype=str)
     if "ID" in df.columns:
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
+
 # Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64)
 def exibir_documento(caminho_arquivo, titulo):
     if pd.isna(caminho_arquivo) or str(caminho_arquivo).strip() in ["None", ""]:
@@ -491,6 +486,97 @@ def gerar_pdf_os(os_row):
     buffer.seek(0)
     return buffer.getvalue()
 
+# --- FUNÇÃO PARA GERAR O HTML COMPLETO DA OS DA IMPRESSÃO ---
+def gerar_html_os_impressao(os_row):
+    equipamento_val = os_row['Equipamento'] if pd.notna(os_row.get('Equipamento')) else 'N/A'
+    solucao_val = os_row['Solucao'] if pd.notna(os_row.get('Solucao')) else ''
+    itens_val = os_row['Itens_Trocados'] if pd.notna(os_row.get('Itens_Trocados')) else ''
+    finalizador_val = os_row['finalizado_por'] if pd.notna(os_row.get('finalizado_por')) else ''
+    data_criacao_val = str(os_row['Data_Criacao'])
+    
+    logo_base64 = ""
+    if os.path.exists("logo.png"):
+        with open("logo.png", "rb") as img_file:
+            logo_base64 = base64.b64encode(img_file.read()).decode()
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
+        .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
+        .btn-imprimir {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
+        @media print {{ .print-btn-container {{ display: none !important; }} body {{ padding: 0; }} }}
+    </style>
+</head>
+<body>
+    <div class="print-btn-container">
+        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir O.S.</button>
+    </div>
+    <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+            <tr>
+                <td style="width: 28%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
+                    <img src="data:image/png;base64,{logo_base64}" style="max-height: 45px; max-width: 100%;">
+                </td>
+                <td style="width: 44%; border: 1px solid #000; text-align: center; vertical-align: middle;">
+                    <h3 style="margin: 0; color: #000 !important; font-size: 15px;">Solicitação de Manutenção - Ordem de Serviço</h3>
+                </td>
+                <td style="width: 28%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
+                    <b>FM 12</b><br>Revisão: 02/2024
+                </td>
+            </tr>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Número:</b> {os_row['ID']}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 34%;"><b>Data:</b> {data_criacao_val.split(' ')[0]}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Hora:</b> {data_criacao_val.split(' ')[1] if len(data_criacao_val.split(' ')) > 1 else '17:00'}</td>
+            </tr>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; text-align: center; color: #000 !important;">
+            <tr>
+                <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Tipo de Manutenção</b></td>
+                <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Prioridade de Manutenção</b></td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{os_row['Tipo_Manutencao']}</td>
+                <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{os_row['Prioridade']}</td>
+            </tr>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SETOR:</b> {os_row['Setor']}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SOLICITANTE:</b> {os_row['Solicitante']}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px;" colspan="2"><b>Equipamento:</b> {equipamento_val}</td>
+            </tr>
+        </table>
+        <div style="border: 1px solid #000; border-top: none;">
+            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição do Problema</div>
+            <div style="padding: 10px; min-height: 70px; font-size: 13px; color: #000 !important;">{os_row['Descricao']}</div>
+        </div>
+        <div style="border: 1px solid #000; border-top: none;">
+            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição da Solução</div>
+            <div style="padding: 10px; min-height: 50px; font-size: 13px; color: #000 !important;">{solucao_val}</div>
+        </div>
+        <div style="border: 1px solid #000; border-top: none;">
+            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Itens Trocados</div>
+            <div style="padding: 10px; min-height: 40px; font-size: 13px; color: #000 !important;">{itens_val}</div>
+        </div>
+        <table style="width: 100%; margin-top: 35px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
+            <tr>
+                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Manutenção</b></td>
+                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Responsável pelo Serviço ({finalizador_val})</b></td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
+"""
 
 # --- FUNÇÃO PARA APLICAR A ASSINATURA DIGITAL NO FINAL DO DOCUMENTO ---
 def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_usuario):
@@ -876,107 +962,8 @@ with st.sidebar:
     st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; opacity: 0.7; margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
 
 if menu is not None:
-
-    # ==========================================
-    # --- TELA 0: DASHBOARD (NOVO) ---
-    # ==========================================
-    if menu == "📊 Dashboard":
-        st.markdown("# 📊 Dashboard Integrado")
-        
-        # Carregando bases
-        df_os_db = carregar_banco_os()
-        df_comp_db = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-        
-        # Tratamento de Datas para as duas bases
-        df_os_db['Data_Parsed'] = pd.to_datetime(df_os_db['Data_Criacao'].str.split(' ').str[0], format='%d/%m/%Y', errors='coerce')
-        if df_os_db['Data_Parsed'].isna().all():
-            df_os_db['Data_Parsed'] = pd.to_datetime(df_os_db['Data_Criacao'], errors='coerce')
-            
-        df_comp_db['Data_Parsed'] = pd.to_datetime(df_comp_db['Data_Solicitacao'].str.split(' ').str[0], format='%Y-%m-%d', errors='coerce')
-        if df_comp_db['Data_Parsed'].isna().all():
-            df_comp_db['Data_Parsed'] = pd.to_datetime(df_comp_db['Data_Solicitacao'], errors='coerce')
-            
-        for df_temp in [df_os_db, df_comp_db]:
-            df_temp['Dia'] = df_temp['Data_Parsed'].dt.strftime('%d')
-            df_temp['Mes'] = df_temp['Data_Parsed'].dt.strftime('%m')
-            df_temp['Ano'] = df_temp['Data_Parsed'].dt.strftime('%Y')
-
-        # Filtros Globais
-        st.markdown("### 🔍 Filtros Globais")
-        col_fd, col_fm, col_fa = st.columns(3)
-        
-        all_days = pd.concat([df_os_db['Dia'], df_comp_db['Dia']]).dropna().unique().tolist()
-        all_months = pd.concat([df_os_db['Mes'], df_comp_db['Mes']]).dropna().unique().tolist()
-        all_years = pd.concat([df_os_db['Ano'], df_comp_db['Ano']]).dropna().unique().tolist()
-        
-        with col_fd:
-            f_dia = st.selectbox("Filtrar por Dia", ["Todos"] + sorted(all_days))
-        with col_fm:
-            f_mes = st.selectbox("Filtrar por Mês", ["Todos"] + sorted(all_months))
-        with col_fa:
-            f_ano = st.selectbox("Filtrar por Ano", ["Todos"] + sorted(all_years))
-            
-        if f_dia != "Todos":
-            df_os_db = df_os_db[df_os_db['Dia'] == f_dia]
-            df_comp_db = df_comp_db[df_comp_db['Dia'] == f_dia]
-        if f_mes != "Todos":
-            df_os_db = df_os_db[df_os_db['Mes'] == f_mes]
-            df_comp_db = df_comp_db[df_comp_db['Mes'] == f_mes]
-        if f_ano != "Todos":
-            df_os_db = df_os_db[df_os_db['Ano'] == f_ano]
-            df_comp_db = df_comp_db[df_comp_db['Ano'] == f_ano]
-            
-        st.markdown("---")
-        
-        # --- SETOR 1: COMPRAS ---
-        st.markdown("### 🛒 Setor: Compras")
-        cp_c1, cp_c2, cp_c3 = st.columns(3)
-        total_cp = len(df_comp_db)
-        
-        realizadas = len(df_comp_db[df_comp_db['Status'].str.lower().str.contains("realizada", na=False)])
-        cp_c1.metric("Total de Solicitações", total_cp)
-        cp_c2.metric("Compras Realizadas", realizadas)
-        cp_c3.metric("Compras Pendentes/Recusadas", total_cp - realizadas)
-        
-        if not df_comp_db.empty:
-            cp_g1, cp_g2 = st.columns(2)
-            with cp_g1:
-                fig_cp = px.histogram(df_comp_db, x='Categoria', title="Compras por Categoria", color='Categoria')
-                fig_cp.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
-                st.plotly_chart(fig_cp, use_container_width=True)
-            with cp_g2:
-                fig_cp_status = px.pie(df_comp_db, names='Status', title="Proporção de Status de Compra", hole=0.3)
-                fig_cp_status.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
-                st.plotly_chart(fig_cp_status, use_container_width=True)
-        else:
-            st.info("Sem dados de compras para o período selecionado.")
-
-        st.markdown("---")
-
-        # --- SETOR 2: O.S. ---
-        st.markdown("### 🔧 Setor: Ordens de Serviço (O.S.)")
-        os_c1, os_c2, os_c3 = st.columns(3)
-        total_os = len(df_os_db)
-        fin_os = len(df_os_db[df_os_db['Status'] == 'Finalizada'])
-        os_c1.metric("Total de O.S.", total_os)
-        os_c2.metric("O.S. Finalizadas", fin_os)
-        os_c3.metric("O.S. Pendentes", total_os - fin_os)
-        
-        if not df_os_db.empty:
-            os_g1, os_g2 = st.columns(2)
-            with os_g1:
-                fig_os = px.pie(df_os_db, names='Setor', title="O.S. por Setor")
-                fig_os.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
-                st.plotly_chart(fig_os, use_container_width=True)
-            with os_g2:
-                fig_os_bar = px.bar(df_os_db.groupby('Status').size().reset_index(name='Contagem'), x='Status', y='Contagem', title="O.S. por Status", color='Status')
-                fig_os_bar.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
-                st.plotly_chart(fig_os_bar, use_container_width=True)
-        else:
-            st.info("Sem dados de O.S. para o período selecionado.")
-
     # --- TELA 1: CRIAR NOVA O.S. ---
-    elif menu == "📝 Nova O.S.":
+    if menu == "📝 Nova O.S.":
         st.markdown("# 📝 Abertura de Ordem de Serviço (O.S.)")
         st.markdown("Preencha os dados abaixo para registrar a solicitação de manutenção.")
         
@@ -1346,117 +1333,19 @@ if menu is not None:
         if df.empty:
             st.warning("Não há O.S. cadastradas para impressão.")
         else:
-            tab_imp1, tab_imp2 = st.tabs(["📄 Imprimir O.S. Selecionadas", "📊 Relatório Geral de O.S."])
+            tab_imp1, tab_imp2 = st.tabs(["📄 Imprimir O.S.", "📊 Relatório Geral de O.S."])
             
             with tab_imp1:
-                st.markdown("### Selecione as O.S. para impressão em lote")
                 lista_os = df["ID"].astype(str) + " - " + df["Solicitante"] + " (" + df["Setor"] + ")"
-                os_selecionadas = st.multiselect("Selecione as O.S. desejadas:", lista_os)
+                os_selecionada = st.selectbox("Selecione a O.S. desejada:", lista_os)
                 
-                if os_selecionadas:
-                    ids_selecionados = [int(x.split(" - ")[0]) for x in os_selecionadas]
-                    df_selecionadas = df[df["ID"].isin(ids_selecionados)]
-                    
-                    st.markdown("---")
-                    
-                    logo_base64 = ""
-                    if os.path.exists("logo.png"):
-                        with open("logo.png", "rb") as img_file:
-                            logo_base64 = base64.b64encode(img_file.read()).decode()
-
-                    html_content = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <style>
-                            body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
-                            .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
-                            .btn-imprimir {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-                            .page-break {{ page-break-after: always; margin-bottom: 30px; }}
-                            @media print {{ .print-btn-container, .no-print {{ display: none !important; }} body {{ padding: 0; }} .page-break {{ margin-bottom: 0; }} }}
-                        </style>
-                    </head>
-                    <body>
-                        <div class="print-btn-container">
-                            <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Selecionados</button>
-                        </div>
-                    """
-                    for idx, row in df_selecionadas.iterrows():
-                        equipamento_val = row['Equipamento'] if pd.notna(row.get('Equipamento')) else 'N/A'
-                        solucao_val = row['Solucao'] if pd.notna(row.get('Solucao')) else ''
-                        itens_val = row['Itens_Trocados'] if pd.notna(row.get('Itens_Trocados')) else ''
-                        finalizador_val = row['finalizado_por'] if pd.notna(row.get('finalizado_por')) else ''
-                        data_criacao_val = str(row['Data_Criacao'])
-                        data_split = data_criacao_val.split(' ')
-                        data_str = data_split[0]
-                        hora_str = data_split[1] if len(data_split) > 1 else '17:00'
-
-                        html_content += f"""
-                        <div class="page-break">
-                            <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
-                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
-                                    <tr>
-                                        <td style="width: 28%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
-                                            <img src="data:image/png;base64,{logo_base64}" style="max-height: 45px; max-width: 100%;">
-                                        </td>
-                                        <td style="width: 44%; border: 1px solid #000; text-align: center; vertical-align: middle;">
-                                            <h3 style="margin: 0; color: #000 !important; font-size: 15px;">Solicitação de Manutenção - Ordem de Serviço</h3>
-                                        </td>
-                                        <td style="width: 28%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
-                                            <b>FM 12</b><br>Revisão: 02/2024
-                                        </td>
-                                    </tr>
-                                </table>
-                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
-                                    <tr>
-                                        <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Número:</b> {row['ID']}</td>
-                                        <td style="border: 1px solid #000; padding: 5px; width: 34%;"><b>Data:</b> {data_str}</td>
-                                        <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Hora:</b> {hora_str}</td>
-                                    </tr>
-                                </table>
-                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; text-align: center; color: #000 !important;">
-                                    <tr>
-                                        <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Tipo de Manutenção</b></td>
-                                        <td style="border: 1px solid #000; background-color: #e0e0e0; padding: 4px; width: 50%;"><b>Prioridade de Manutenção</b></td>
-                                    </tr>
-                                    <tr>
-                                        <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{row['Tipo_Manutencao']}</td>
-                                        <td style="border: 1px solid #000; padding: 10px; font-size: 14px; font-weight: bold;">{row['Prioridade']}</td>
-                                    </tr>
-                                </table>
-                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important;">
-                                    <tr>
-                                        <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SETOR:</b> {row['Setor']}</td>
-                                        <td style="border: 1px solid #000; padding: 5px; width: 50%;"><b>SOLICITANTE:</b> {row['Solicitante']}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="border: 1px solid #000; padding: 5px;" colspan="2"><b>Equipamento:</b> {equipamento_val}</td>
-                                    </tr>
-                                </table>
-                                <div style="border: 1px solid #000; border-top: none;">
-                                    <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição do Problema</div>
-                                    <div style="padding: 10px; min-height: 70px; font-size: 13px; color: #000 !important;">{row['Descricao']}</div>
-                                </div>
-                                <div style="border: 1px solid #000; border-top: none;">
-                                    <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Descrição da Solução</div>
-                                    <div style="padding: 10px; min-height: 50px; font-size: 13px; color: #000 !important;">{solucao_val}</div>
-                                </div>
-                                <div style="border: 1px solid #000; border-top: none;">
-                                    <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Itens Trocados</div>
-                                    <div style="padding: 10px; min-height: 40px; font-size: 13px; color: #000 !important;">{itens_val}</div>
-                                </div>
-                                <table style="width: 100%; margin-top: 35px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
-                                    <tr>
-                                        <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Manutenção</b></td>
-                                        <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Responsável pelo Serviço ({finalizador_val})</b></td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                        """
-                    html_content += "</body></html>"
-                    components.html(html_content, height=920, scrolling=True)
+                id_selecionado = int(os_selecionada.split(" - ")[0])
+                os_row = df[df["ID"] == id_selecionado].iloc[0]
+                
+                st.markdown("---")
+                
+                print_html = gerar_html_os_impressao(os_row)
+                components.html(print_html, height=920, scrolling=True)
 
             with tab_imp2:
                 st.subheader("Filtros para o Relatório de Ordens de Serviço (O.S.)")
@@ -1601,20 +1490,6 @@ if menu is not None:
                 df_fms['Status'] = df_fms['Dias_Restantes'].apply(lambda x: "Atrasado 🔴" if x < 0 else "No Prazo 🟢")
                 
                 st.dataframe(df_fms[["FM", "Data_Realizada", "Periodo", "Vencimento", "Dias_Restantes", "Status"]], use_container_width=True)
-                
-                st.markdown("---")
-                
-                # NOVO: Gráfico dinâmico entre prazos e dias faltantes
-                fig_fms = px.bar(
-                    df_fms, 
-                    x='FM', 
-                    y='Dias_Restantes', 
-                    color='Status', 
-                    title="Análise de Dias Restantes por Formulário (FMs)",
-                    color_discrete_map={"No Prazo 🟢": "#00ffcc", "Atrasado 🔴": "#ff4b4b"}
-                )
-                fig_fms.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
-                st.plotly_chart(fig_fms, use_container_width=True)
 
     # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---
     elif menu == "🛒 Solicitações de Compras":
@@ -1786,4 +1661,425 @@ if menu is not None:
                                 st.markdown(f"Item #{idx_r+1}: <b>{r_val['Item']}</b> ({r_val['Categoria']})", unsafe_allow_html=True)
                                 nova_qtd = st.number_input(f"Qtd para {r_val['Item']}", min_value=1, value=int(float(r_val['Quantidade'])) if str(r_val['Quantidade']).replace('.','',1).isdigit() else 1, key=f"qty_{id_pedido_status}_{idx_r}")
                                 novo_nome_item = st.text_input(f"Nome do Item {idx_r+1}", value=r_val['Item'], key=f"name_{id_pedido_status}_{idx_r}")
-                                # Adicionais não preenchidos para não alongar muito o form, seguem lógica simples
+                                item_edits.append({"index_original": r_val['index'], "novo_nome": novo_nome_item, "nova_qtd": nova_qtd})
+                            
+                            col_st1, col_st2 = st.columns(2)
+                            btn_salvar_status = col_st1.form_submit_button("💾 Salvar Alterações", use_container_width=True)
+                            btn_exc_compra = col_st2.form_submit_button("🗑️ Excluir Pedido", type="primary", use_container_width=True)
+                            
+                            if btn_salvar_status:
+                                if "Realizada" in novo_status_pedido:
+                                    status_limpo = "Compra Realizada"
+                                elif "Recusada" in novo_status_pedido:
+                                    status_limpo = "Compra Recusada"
+                                else:
+                                    status_limpo = "Compra em Aberta"
+
+                                df_ger_c.loc[df_ger_c["ID_Compra"] == str(id_pedido_status), "Status"] = status_limpo
+                                
+                                for ed in item_edits:
+                                    orig_idx = ed["index_original"]
+                                    df_ger_c.loc[orig_idx, "Item"] = str(ed["novo_nome"]).upper()
+                                    df_ger_c.loc[orig_idx, "Quantidade"] = str(ed["nova_qtd"])
+                                
+                                df_to_save = df_ger_c.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
+                                df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
+                                st.success("Status e itens atualizados com sucesso!")
+                                st.rerun()
+                                
+                            if btn_exc_compra:
+                                df_ger_c = df_ger_c[df_ger_c["ID_Compra"] != str(id_pedido_status)]
+                                df_to_save = df_ger_c.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
+                                df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
+                                st.success("Pedido excluído com sucesso!")
+                                st.rerun()
+                else:
+                    st.info("🔒 Gerenciamento restrito a administradores.")
+
+        with tab_comp2:
+            st.markdown("### Adicione os itens desejados na solicitação:")
+            with st.form("form_add_item_compra", clear_on_submit=True):
+                col_i1, col_i2, col_i3 = st.columns([2, 1.5, 1])
+                with col_i1:
+                    item_input = st.text_input("Nome do Material / Item *")
+                with col_i2:
+                    cat_input = st.selectbox("Categoria", ["Material de Escritório", "Item Operacional", "Material de Limpeza"])
+                with col_i3:
+                    qtd_input = st.number_input("Quantidade", min_value=1, value=1)
+                    
+                btn_add_item = st.form_submit_button("➕ Adicionar Item à Lista", use_container_width=True)
+                if btn_add_item:
+                    if not item_input:
+                        st.error("Informe o nome do material!")
+                    else:
+                        st.session_state.carrinho_compras.append({
+                            "Item": item_input.upper(),
+                            "Categoria": cat_input,
+                            "Quantidade": int(qtd_input)
+                        })
+                        st.success(f"Item '{item_input.upper()}' adicionado!")
+            
+            if st.session_state.carrinho_compras:
+                st.markdown("#### Itens Atuais na Solicitação:")
+                df_carrinho = pd.DataFrame(st.session_state.carrinho_compras)
+                st.dataframe(df_carrinho, use_container_width=True)
+                
+                if st.button("🗑️ Limpar Lista de Itens"):
+                    st.session_state.carrinho_compras = []
+                    st.rerun()
+                
+                st.markdown("---")
+                with st.form("form_finalizar_pedido"):
+                    st.markdown("#### Dados Finais da Solicitação:")
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1:
+                        solicitante_c = st.text_input("Nome do Solicitante *")
+                        setor_c = st.selectbox("Setor", ["OPERAÇÃO", "MANUTENÇÃO", "PORTARIA", "ADMINISTRATIVO", "TI"])
+                    with col_f2:
+                        obs_c = st.text_area("Observações / Justificativa Geral")
+                        
+                    submit_final_compra = st.form_submit_button("💾 Salvar e Registrar Pedido Completo", use_container_width=True)
+                    if submit_final_compra:
+                        if not solicitante_c:
+                            st.error("Preencha o nome do Solicitante!")
+                        else:
+                            df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+                            if not df_c.empty and "ID_Compra" in df_c.columns:
+                                ids_nums = pd.to_numeric(df_c["ID_Compra"], errors="coerce").dropna()
+                                novo_id_c = int(ids_nums.max() + 1) if not ids_nums.empty else 501
+                            else:
+                                novo_id_c = 501
+                                
+                            data_hora_atual = datetime.now().strftime("%Y-%m-%d %H:%M")
+                            
+                            novas_linhas = []
+                            for it in st.session_state.carrinho_compras:
+                                novas_linhas.append({
+                                    "ID_Compra": str(novo_id_c),
+                                    "Data_Solicitacao": data_hora_atual,
+                                    "Solicitante": solicitante_c.upper(),
+                                    "Setor": setor_c.upper(),
+                                    "Categoria": it["Categoria"],
+                                    "Item": it["Item"],
+                                    "Quantidade": str(it["Quantidade"]),
+                                    "Observacoes": obs_c.upper() if obs_c else "",
+                                    "Status": "Compra em Aberta",
+                                    "Orcamento_Assinado": "None",
+                                    "NF_Anexada": "None",
+                                    "Boleto_Anexado": "None",
+                                    "Assinado_Por": "None"
+                                })
+                            
+                            df_c = pd.concat([df_c, pd.DataFrame(novas_linhas)], ignore_index=True)
+                            df_c.to_csv(ARQUIVO_COMPRAS, index=False)
+                            st.session_state.carrinho_compras = []
+                            st.success(f"Solicitação de Compra #{novo_id_c} registrada com sucesso!")
+                            st.rerun()
+
+        with tab_comp3:
+            df_c_print = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+            if df_c_print.empty:
+                st.warning("Nenhuma solicitação de compra cadastrada para impressão.")
+            else:
+                ids_disponiveis = sorted(df_c_print["ID_Compra"].unique().tolist(), reverse=True)
+                
+                col_print1, col_print2 = st.columns([2, 1])
+                with col_print1:
+                    pedido_sel_id = st.selectbox("Selecione o ID do Pedido de Compra:", ids_disponiveis)
+                
+                itens_pedido = df_c_print[df_c_print["ID_Compra"] == str(pedido_sel_id)]
+                row_c_base = itens_pedido.iloc[0]
+                
+                with col_print2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    anexo_path = row_c_base.get("Orcamento_Assinado", "None")
+                    if pd.notna(anexo_path) and str(anexo_path).strip() != "None" and str(anexo_path).strip() != "" and os.path.exists(str(anexo_path)):
+                        with open(anexo_path, "rb") as file:
+                            st.download_button(
+                                label="📥 Baixar Orçamento Anexado",
+                                data=file,
+                                file_name=os.path.basename(str(anexo_path)),
+                                mime="application/octet-stream",
+                                use_container_width=True
+                            )
+                    else:
+                        st.info("Nenhum orçamento anexado a este pedido.")
+                
+                st.markdown("---")
+                
+                logo_base64 = ""
+                if os.path.exists("logo.png"):
+                    with open("logo.png", "rb") as img_file:
+                        logo_base64 = base64.b64encode(img_file.read()).decode()
+                        
+                linhas_tabela_html = ""
+                for _, row in itens_pedido.iterrows():
+                    linhas_tabela_html += f"""
+                    <tr>
+                        <td style="border: 1px solid #000; padding: 8px; width: 60%;"><b>{row['Item']}</b> ({row['Categoria']})</td>
+                        <td style="border: 1px solid #000; padding: 8px; width: 40%; text-align: center;">{row['Quantidade']}</td>
+                    </tr>
+                    """
+                        
+                print_compra_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
+        .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
+        .btn-imprimir {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
+        @media print {{ .print-btn-container {{ display: none !important; }} body {{ padding: 0; }} }}
+    </style>
+</head>
+<body>
+    <div class="print-btn-container">
+        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Ordem de Solicitação de Compra</button>
+    </div>
+    <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+            <tr>
+                <td style="width: 28%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
+                    <img src="data:image/png;base64,{logo_base64}" style="max-height: 45px; max-width: 100%;">
+                </td>
+                <td style="width: 44%; border: 1px solid #000; text-align: center; vertical-align: middle;">
+                    <h3 style="margin: 0; color: #000 !important; font-size: 15px;">Ordem de Solicitação de Compras</h3>
+                </td>
+                <td style="width: 28%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
+                    <b>LOG-COMPRAS</b>
+                </td>
+            </tr>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important; margin-top: 5px;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>ID Pedido:</b> #{row_c_base['ID_Compra']}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 34%;"><b>Data:</b> {row_c_base['Data_Solicitacao']}</td>
+                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Status:</b> {row_c_base['Status']}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #000; padding: 5px;" colspan="2"><b>Solicitante:</b> {row_c_base['Solicitante']}</td>
+                <td style="border: 1px solid #000; padding: 5px;"><b>Setor:</b> {row_c_base['Setor']}</td>
+            </tr>
+        </table>
+        <div style="margin-top: 15px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #000 !important;">
+                <thead>
+                    <tr style="background-color: #e0e0e0;">
+                        <th style="border: 1px solid #000; padding: 8px; text-align: left;">Item / Material</th>
+                        <th style="border: 1px solid #000; padding: 8px; text-align: center;">Quantidade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {linhas_tabela_html}
+                </tbody>
+            </table>
+        </div>
+        <div style="border: 1px solid #000; margin-top: 15px;">
+            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Observações / Justificativa</div>
+            <div style="padding: 10px; min-height: 50px; font-size: 13px; color: #000 !important;">{row_c_base.get('Observacoes', '')}</div>
+        </div>
+        <table style="width: 100%; margin-top: 40px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
+            <tr>
+                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Solicitante ({row_c_base['Solicitante']})</b></td>
+                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Aprovação Compras / Gerência</b></td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
+"""
+                components.html(print_compra_html, height=750, scrolling=True)
+
+        # ABA 4 - ASSINATURAS E ENVIOS DE E-MAIL (SOMENTE ADMIN)
+        if is_user_admin:
+            with tab_comp4:
+                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto)")
+                
+                df_ass = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+                if df_ass.empty:
+                    st.info("Nenhuma compra registrada para assinar.")
+                else:
+                    ids_ass = sorted(df_ass["ID_Compra"].unique().tolist(), reverse=True)
+                    
+                    col_sel1, col_sel2 = st.columns([2.5, 1])
+                    
+                    with col_sel1:
+                        id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
+                        rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
+                        row_base_ass = rows_ass.iloc[0]
+                    
+                    df_u_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                    row_u_logged = df_u_check[df_u_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
+                    ass_png_path = "None"
+                    if not row_u_logged.empty:
+                        ass_png_path = str(row_u_logged.iloc[0].get("Assinatura_PNG", "None"))
+                    tem_assinatura_png = (ass_png_path != "None" and os.path.exists(ass_png_path))
+
+                    with col_sel2:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        btn_assinar_agora = st.button("✍️ Assinar Doc", disabled=not tem_assinatura_png, use_container_width=True)
+                        if btn_assinar_agora:
+                            documentos_para_assinar = [
+                                str(row_base_ass.get("Orcamento_Assinado", "None")),
+                                str(row_base_ass.get("NF_Anexada", "None")),
+                                str(row_base_ass.get("Boleto_Anexado", "None"))
+                            ]
+                            
+                            assinaram_algo = False
+                            for doc in documentos_para_assinar:
+                                if doc != "None" and os.path.exists(doc):
+                                    res = carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario)
+                                    if res:
+                                        assinaram_algo = True
+                                        
+                            if assinaram_algo:
+                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
+                                df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
+                                st.success(f"Documentos do Pedido #{id_sel_ass} assinados digitalmente por {st.session_state.usuario}!")
+                                st.rerun()
+                            else:
+                                st.error("Nenhum documento válido encontrado/anexado para assinar.")
+
+                    p_orc = row_base_ass.get("Orcamento_Assinado", "None")
+                    p_nf = row_base_ass.get("NF_Anexada", "None")
+                    p_bol = row_base_ass.get("Boleto_Anexado", "None")
+                    p_ass = row_base_ass.get("Assinado_Por", "None")
+                    
+                    has_orc = pd.notna(p_orc) and str(p_orc).strip() != "None" and os.path.exists(str(p_orc))
+                    has_nf = pd.notna(p_nf) and str(p_nf).strip() != "None" and os.path.exists(str(p_nf))
+                    has_bol = pd.notna(p_bol) and str(p_bol).strip() != "None" and os.path.exists(str(p_bol))
+                    has_signature = pd.notna(p_ass) and str(p_ass).strip() != "None" and str(p_ass).strip() != ""
+                    
+                    val_orc = '<span class="badge-success">✅ Anexado</span>' if has_orc else '<span class="badge-danger">❌ Pendente</span>'
+                    val_nf = '<span class="badge-success">✅ Anexada</span>' if has_nf else '<span class="badge-danger">❌ Pendente</span>'
+                    val_bol = '<span class="badge-success">✅ Anexado</span>' if has_bol else '<span class="badge-danger">❌ Pendente</span>'
+                    val_ass = f'<span class="badge-success">✅ Por {p_ass}</span>' if has_signature else '<span class="badge-warning">⚠️ Não Assinado</span>'
+
+                    st.markdown(f"""
+                    <div class="status-card-container">
+                        <div class="status-card">
+                            <div class="status-card-title">Orçamento</div>
+                            <div class="status-card-value">{val_orc}</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-card-title">Nota Fiscal</div>
+                            <div class="status-card-value">{val_nf}</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-card-title">Boleto</div>
+                            <div class="status-card-value">{val_bol}</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-card-title">Assinatura Digital</div>
+                            <div class="status-card-value">{val_ass}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    itens_do_pedido_str = ", ".join([f"{r['Item']} (Qtd: {r['Quantidade']})" for _, r in rows_ass.iterrows()])
+                    solicitante_pedido = row_base_ass.get("Solicitante", "N/A")
+                    setor_pedido = row_base_ass.get("Setor", "N/A")
+                    obs_pedido = row_base_ass.get("Observacoes", "Sem observações")
+
+                    st.info(f"📋 **Descrição do Pedido #{id_sel_ass}:**\n\n"
+                            f"* **Solicitante:** {solicitante_pedido} | **Setor:** {setor_pedido}\n"
+                            f"* **Itens:** {itens_do_pedido_str}\n"
+                            f"* **Observações:** {obs_pedido}")
+
+                    st.markdown("---")
+                    
+                    col_upload, col_acoes = st.columns(2)
+                    
+                    with col_upload:
+                        with st.form("form_up_nf_bol"):
+                            st.markdown("**Upload de Nota Fiscal e Boleto**")
+                            up_nf = st.file_uploader("Upload da Nota Fiscal (NF)", type=["pdf", "png", "jpg", "jpeg"])
+                            up_bol = st.file_uploader("Upload do Boleto", type=["pdf", "png", "jpg", "jpeg"])
+                            
+                            if st.form_submit_button("Salvar Documentos"):
+                                salvou_algo = False
+                                if up_nf is not None:
+                                    nf_name = f"nf_{id_sel_ass}_{up_nf.name}"
+                                    nf_path = os.path.join("uploads_orcamentos", nf_name)
+                                    with open(nf_path, "wb") as f: 
+                                        f.write(up_nf.getbuffer())
+                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "NF_Anexada"] = nf_path
+                                    salvou_algo = True
+                                    
+                                if up_bol is not None:
+                                    bol_name = f"boleto_{id_sel_ass}_{up_bol.name}"
+                                    bol_path = os.path.join("uploads_orcamentos", bol_name)
+                                    with open(bol_path, "wb") as f: 
+                                        f.write(up_bol.getbuffer())
+                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Boleto_Anexado"] = bol_path
+                                    salvou_algo = True
+                                    
+                                if salvou_algo:
+                                    df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
+                                    st.success("Documentos salvos com sucesso!")
+                                    st.rerun()
+                                else:
+                                    st.warning("Selecione ao menos um arquivo para salvar.")
+
+                    with col_acoes:
+                        if not tem_assinatura_png:
+                            st.warning("⚠️ Seu usuário não possui uma assinatura em PNG cadastrada na tela de Login.")
+                        
+                        with st.form("form_enviar_email_docs"):
+                            st.markdown("**📧 Enviar Documentos por E-mail:**")
+                            dest_email = st.text_input("E-mail do Destinatário", value="financeiro@stang.com.br")
+                            obs_email = st.text_area("Observações do E-mail", value="", height=100)
+                            
+                            btn_enviar_e = st.form_submit_button("🚀 Enviar E-mail com Anexos", use_container_width=True)
+                            
+                            if btn_enviar_e:
+                                if not dest_email:
+                                    st.error("Informe o e-mail do destinatário.")
+                                else:
+                                    df_u_l = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                                    row_u_l = df_u_l[df_u_l["Usuario"].str.lower() == st.session_state.usuario.lower()]
+                                    
+                                    if row_u_l.empty:
+                                        st.error("Dados de usuário não encontrados para envio.")
+                                    else:
+                                        u_row_dict = row_u_l.iloc[0].to_dict()
+                                        cfg_e_dict = {
+                                            "Email_Remetente": u_row_dict.get("Email_Usuario", ""),
+                                            "Senha_App": u_row_dict.get("Senha_App_Email", ""),
+                                            "Servidor_SMTP": u_row_dict.get("Servidor_SMTP", "smtp.gmail.com"),
+                                            "Porta_SMTP": u_row_dict.get("Porta_SMTP", "587"),
+                                            "Nome_Remetente": st.session_state.usuario
+                                        }
+                                        
+                                        anexos_envio = [
+                                            str(row_base_ass.get("Orcamento_Assinado", "None")),
+                                            str(row_base_ass.get("NF_Anexada", "None")),
+                                            str(row_base_ass.get("Boleto_Anexado", "None"))
+                                        ]
+                                        
+                                        corpo_dinamico = f"Documentação referente ao Pedido de Compra #{id_sel_ass}.\n\nObservações: {obs_email}" if obs_email else f"Documentação referente ao Pedido de Compra #{id_sel_ass}."
+                                        
+                                        sucesso_e, msg_e = enviar_email_real(
+                                            destinatario=dest_email,
+                                            assunto=f"Documentação do Pedido de Compra #{id_sel_ass} - Intranet Stang",
+                                            corpo=corpo_dinamico,
+                                            anexos=anexos_envio,
+                                            config=cfg_e_dict
+                                        )
+                                        
+                                        if sucesso_e:
+                                            st.success(f"E-mail enviado com sucesso para {dest_email}!")
+                                        else:
+                                            st.error(f"Erro no envio: {msg_e}")
+
+                    st.markdown("---")
+                    st.markdown("#### 📄 Visualização de Documentos Vinculados ao Pedido:")
+                    
+                    c_doc1, c_doc2, c_doc3 = st.columns(3)
+                    with c_doc1:
+                        exibir_documento(row_base_ass.get("Orcamento_Assinado", "None"), "Orçamento")
+                    with c_doc2:
+                        exibir_documento(row_base_ass.get("NF_Anexada", "None"), "Nota Fiscal")
+                    with c_doc3:
+                        exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
