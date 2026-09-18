@@ -1488,7 +1488,7 @@ if st.session_state.autenticado:
                                             "Nome_Remetente": f"{st.session_state.usuario} - Intranet"
                                         }
                                         
-                                        assunto = f"Aprovação deAqui está o código completo refatorado, incluindo todas as implementações solicitadas: o **botão de impressão do relatório geral de O.S.**, o **Dashboard global integrado estilo Power BI com fundo transparente (dividido entre O.S. e Compras)**, o **gráfico comparativo de prazos no painel de FMs**, e a **restauração exata** das lógicas de Assinaturas e Compras que haviam sido cortadas.
+                                        assunto = "Aprovação deAqui está o código completo refatorado, incluindo todas as implementações solicitadas: o **botão de impressão do relatório geral de O.S.**, o **Dashboard global integrado estilo Power BI com fundo transparente (dividido entre O.S. e Compras)**, o **gráfico comparativo de prazos no painel de FMs**, e a **restauração exata** das lógicas de Assinaturas e Compras que haviam sido cortadas.
 
 ```python
 import streamlit as st
