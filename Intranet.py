@@ -346,7 +346,7 @@ def gerar_pdf_os(os_row):
     
     elements = []
     
-    # 1. Tabela de Cabeçalho (Logo, Título e FM)
+    # Cabeçalho
     logo_cell = Paragraph("<b>STANG</b>", style_title)
     if os.path.exists("logo.png"):
         try:
@@ -372,7 +372,7 @@ def gerar_pdf_os(os_row):
     elements.append(t_header)
     elements.append(Spacer(1, 4))
     
-    # 2. Dados de Identificação (Número, Data, Hora)
+    # Info
     data_criacao_val = str(os_row.get('Data_Criacao', ''))
     partes_dt = data_criacao_val.split(' ')
     data_str = partes_dt[0] if len(partes_dt) > 0 else ''
@@ -394,7 +394,7 @@ def gerar_pdf_os(os_row):
     elements.append(t_info)
     elements.append(Spacer(1, 4))
     
-    # 3. Tipo e Prioridade
+    # Prioriadade
     prio_data = [
         [
             Paragraph("Tipo de Manutenção", style_cell_center_bold),
@@ -415,7 +415,7 @@ def gerar_pdf_os(os_row):
     elements.append(t_prio)
     elements.append(Spacer(1, 4))
     
-    # 4. Setor, Solicitante e Equipamento
+    # Setor
     equip_val = os_row.get('Equipamento', 'N/A')
     if pd.isna(equip_val) or str(equip_val).strip() == "":
         equip_val = 'N/A'
@@ -440,7 +440,7 @@ def gerar_pdf_os(os_row):
     elements.append(t_solic)
     elements.append(Spacer(1, 4))
     
-    # 5. Seções de Texto: Descrição, Solução, Itens Trocados
+    # Textos
     def criar_secao_texto(titulo, conteudo, min_height=40):
         val_txt = conteudo if pd.notna(conteudo) else ""
         sec_data = [
@@ -464,7 +464,7 @@ def gerar_pdf_os(os_row):
     elements.append(criar_secao_texto("Itens Trocados", os_row.get('Itens_Trocados', ''), min_height=35))
     elements.append(Spacer(1, 25))
     
-    # 6. Assinaturas
+    # Assinaturas
     finalizador_val = os_row.get('finalizado_por', '')
     if pd.isna(finalizador_val):
         finalizador_val = ''
@@ -486,7 +486,6 @@ def gerar_pdf_os(os_row):
     buffer.seek(0)
     return buffer.getvalue()
 
-# --- FUNÇÃO PARA GERAR O HTML COMPLETO DA OS DA IMPRESSÃO ---
 def gerar_html_os_impressao(os_row):
     equipamento_val = os_row['Equipamento'] if pd.notna(os_row.get('Equipamento')) else 'N/A'
     solucao_val = os_row['Solucao'] if pd.notna(os_row.get('Solucao')) else ''
@@ -578,13 +577,11 @@ def gerar_html_os_impressao(os_row):
 </html>
 """
 
-# --- FUNÇÃO PARA APLICAR A ASSINATURA DIGITAL NO FINAL DO DOCUMENTO ---
 def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_usuario):
     if not os.path.exists(caminho_doc) or not os.path.exists(caminho_assinatura_png):
         return False
     
     ext = os.path.splitext(caminho_doc)[1].lower()
-    
     if ext == ".pdf" and HAS_PDF_LIBS:
         try:
             reader = PdfReader(caminho_doc)
@@ -627,7 +624,6 @@ def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_u
         except Exception as e:
             st.error(f"Erro ao aplicar carimbo no PDF: {e}")
             return False
-            
     elif ext in [".png", ".jpg", ".jpeg"]:
         try:
             doc_img = Image.open(caminho_doc).convert("RGBA")
@@ -647,10 +643,8 @@ def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_u
         except Exception as e:
             st.error(f"Erro ao aplicar carimbo na Imagem: {e}")
             return False
-            
     return True
 
-# --- FUNÇÃO PARA ENVIO REAL DE E-MAIL VIA SMTP ---
 def enviar_email_real(destinatario, assunto, corpo, anexos, config):
     try:
         remetente = config.get("Email_Remetente", "")
@@ -697,7 +691,7 @@ def enviar_email_real(destinatario, assunto, corpo, anexos, config):
     except Exception as e:
         return False, f"Falha no envio de e-mail: {str(e)}"
 
-# --- SISTEMA DE AUTENTICAÇÃO NA TELA DE LOGIN ---
+# --- SISTEMA DE AUTENTICAÇÃO ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
     st.session_state.usuario = ""
@@ -804,15 +798,10 @@ if not st.session_state.autenticado:
                                     val_str = "Vitalício" if n_val == "Vitalício" else str(n_data)
                                     perm_str = ",".join(n_permissoes)
                                     novo_reg = {
-                                        "Usuario": n_login, 
-                                        "Senha": n_senha, 
-                                        "Validade": val_str,
-                                        "Permissoes": perm_str,
-                                        "Admin": n_admin_opt,
-                                        "Assinatura_PNG": "None",
-                                        "Email_Usuario": n_email,
-                                        "Senha_App_Email": n_senha_app,
-                                        "Servidor_SMTP": n_servidor_smtp,
+                                        "Usuario": n_login, "Senha": n_senha, "Validade": val_str,
+                                        "Permissoes": perm_str, "Admin": n_admin_opt,
+                                        "Assinatura_PNG": "None", "Email_Usuario": n_email,
+                                        "Senha_App_Email": n_senha_app, "Servidor_SMTP": n_servidor_smtp,
                                         "Porta_SMTP": n_porta_smtp
                                     }
                                     df_u = pd.concat([df_u, pd.DataFrame([novo_reg])], ignore_index=True)
@@ -861,1225 +850,681 @@ if not st.session_state.autenticado:
                             st.markdown("<b>📧 Configuração Individual de E-mail (SMTP):</b>", unsafe_allow_html=True)
                             edit_email = st.text_input("E-mail do Usuário", value=str(row_u_edit.get("Email_Usuario", "")))
                             edit_senha_app = st.text_input("Senha de App / Token SMTP", value=str(row_u_edit.get("Senha_App_Email", "")), type="password")
-                            ce_smtp1, ce_smtp2 = st.columns(2)
-                            edit_servidor_smtp = ce_smtp1.text_input("Servidor SMTP Host", value=str(row_u_edit.get("Servidor_SMTP", "smtp.gmail.com")))
-                            edit_porta_smtp = ce_smtp2.text_input("Porta SMTP", value=str(row_u_edit.get("Porta_SMTP", "587")))
-
+                            c_smtp_e1, c_smtp_e2 = st.columns(2)
+                            edit_serv_smtp = c_smtp_e1.text_input("Servidor SMTP", value=str(row_u_edit.get("Servidor_SMTP", "smtp.gmail.com")))
+                            edit_porta_smtp = c_smtp_e2.text_input("Porta SMTP", value=str(row_u_edit.get("Porta_SMTP", "587")))
+                            
                             st.markdown("---")
-                            st.markdown("✍️ **Assinatura Digital em PNG:**")
-                            path_ass_atual = str(row_u_edit.get("Assinatura_PNG", "None"))
-                            if path_ass_atual != "None" and os.path.exists(path_ass_atual):
-                                st.image(path_ass_atual, caption=f"Assinatura Atual de {user_selecionado}", width=200)
-                            else:
-                                st.caption("Nenhuma assinatura digital cadastrada.")
+                            st.markdown("<b>✍️ Assinatura Digital (PNG transparente)</b>", unsafe_allow_html=True)
+                            ass_atual_png = str(row_u_edit.get("Assinatura_PNG", "None"))
+                            if ass_atual_png != "None" and os.path.exists(ass_atual_png):
+                                st.image(ass_atual_png, width=200, caption="Assinatura Cadastrada Atual")
+                            
+                            arquivo_nova_ass = st.file_uploader("Fazer upload de nova assinatura (.png, .jpg)", type=['png', 'jpg', 'jpeg'], key="up_ass_png")
+                            
+                            btn_salvar_edit = st.form_submit_button("Salvar Alterações e Configurações")
+                            
+                            if btn_salvar_edit:
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Senha"] = edit_senha
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Validade"] = "Vitalício" if edit_val_tipo == "Vitalício" else str(edit_data)
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Admin"] = edit_admin_opt
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Permissoes"] = ",".join(edit_permissoes)
                                 
-                            up_assinatura_png = st.file_uploader(f"Upload da Assinatura PNG para {user_selecionado}", type=["png"])
-                            
-                            btn_salvar_edicao = st.form_submit_button("💾 Salvar Alterações")
-                            
-                            if btn_salvar_edicao:
-                                if not edit_permissoes:
-                                    st.error("Selecione pelo menos uma permissão de menu.")
-                                else:
-                                    novo_val_str = "Vitalício" if edit_val_tipo == "Vitalício" else str(edit_data)
-                                    nova_perm_str = ",".join(edit_permissoes)
-                                    
-                                    path_salvo = path_ass_atual
-                                    if up_assinatura_png is not None:
-                                        file_ass_name = f"assinatura_{user_selecionado.lower()}.png"
-                                        path_salvo = os.path.join("uploads_assinaturas", file_ass_name)
-                                        with open(path_salvo, "wb") as f:
-                                            f.write(up_assinatura_png.getbuffer())
-                                            
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Senha"] = edit_senha
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Email_Usuario"] = edit_email
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Senha_App_Email"] = edit_senha_app
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Servidor_SMTP"] = edit_servidor_smtp
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Porta_SMTP"] = edit_porta_smtp
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Validade"] = novo_val_str
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Admin"] = edit_admin_opt
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Permissoes"] = nova_perm_str
-                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Assinatura_PNG"] = path_salvo
-                                    
-                                    df_u_atual.to_csv(ARQUIVO_USERS, index=False)
-                                    st.success(f"Usuário '{user_selecionado}' atualizado!")
-                                    st.rerun()
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Email_Usuario"] = edit_email
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Senha_App_Email"] = edit_senha_app
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Servidor_SMTP"] = edit_serv_smtp
+                                df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Porta_SMTP"] = edit_porta_smtp
+                                
+                                if arquivo_nova_ass is not None:
+                                    ext_ass = os.path.splitext(arquivo_nova_ass.name)[1]
+                                    path_salvar_ass = os.path.join("uploads_assinaturas", f"ass_digital_{user_selecionado}{ext_ass}")
+                                    with open(path_salvar_ass, "wb") as f_a:
+                                        f_a.write(arquivo_nova_ass.read())
+                                    df_u_atual.loc[df_u_atual["Usuario"] == user_selecionado, "Assinatura_PNG"] = path_salvar_ass
+                                
+                                df_u_atual.to_csv(ARQUIVO_USERS, index=False)
+                                st.success(f"Alterações de '{user_selecionado}' salvas com sucesso!")
+                                st.rerun()
 
-                        total_admins = len(df_u_atual[df_u_atual["Admin"] == "Sim"])
-                        is_este_admin = str(row_u_edit.get("Admin")) == "Sim"
-                        
-                        if total_admins <= 1 and is_este_admin:
-                            st.info("⚠️ Este é o único administrador ativo.")
-                        else:
-                            if st.button(f"🗑️ Excluir Usuário '{user_selecionado}'", type="primary"):
+                        if user_selecionado.lower() != "thiagosc":
+                            if st.button(f"🗑️ Excluir o usuário '{user_selecionado}'"):
                                 df_u_atual = df_u_atual[df_u_atual["Usuario"] != user_selecionado]
                                 df_u_atual.to_csv(ARQUIVO_USERS, index=False)
-                                st.success(f"Usuário '{user_selecionado}' removido!")
+                                st.success("Usuário excluído!")
                                 st.rerun()
-            elif senha_master_input != "":
-                st.error("Senha Master ou Administrador incorreta.")
-                    
-    st.stop()
+            else:
+                if senha_master_input:
+                    st.error("Senha de administrador inválida!")
 
-# --- DETERMINAR MENUS PERMITIDOS ---
-df_users_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
-user_logado_row = df_users_check[df_users_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
-
-is_user_admin = False
-if not user_logado_row.empty:
-    is_user_admin = str(user_logado_row.iloc[0].get("Admin", "Não")) == "Sim"
-
-if not user_logado_row.empty and pd.notna(user_logado_row.iloc[0].get("Permissoes")) and str(user_logado_row.iloc[0]["Permissoes"]) != "":
-    menus_disponiveis = [m.strip() for m in str(user_logado_row.iloc[0]["Permissoes"]).split(",") if m.strip() in TODOS_MENUS]
-else:
-    menus_disponiveis = TODOS_MENUS
-
-# --- BARRA LATERAL (MENU) ---
-with st.sidebar:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", use_container_width=True)
-    st.markdown("---")
-    cargo_str = "Administrador 🔑" if is_user_admin else "Usuário 👤"
-    st.markdown(f"👤 Logado como: **{st.session_state.usuario}**<br>🛡️ Perfil: *{cargo_str}*", unsafe_allow_html=True)
+if st.session_state.autenticado:
+    df_u_auth = pd.read_csv(ARQUIVO_USERS, dtype=str)
+    try:
+        user_auth_row = df_u_auth[df_u_auth["Usuario"] == st.session_state.usuario].iloc[0]
+        permissoes_usuario = [p.strip() for p in str(user_auth_row["Permissoes"]).split(",") if p.strip()]
+        is_admin_usuario = str(user_auth_row.get("Admin", "Não")) == "Sim"
+    except:
+        permissoes_usuario = []
+        is_admin_usuario = False
     
-    if menus_disponiveis:
-        menu = st.radio("Navegação Principal", menus_disponiveis)
-    else:
-        st.warning("⚠️ Você não possui permissão para acessar nenhum menu.")
-        menu = None
+    st.sidebar.markdown(f"### 👤 Olá, **{st.session_state.usuario}**")
     
-    st.markdown("---")
-    
-    if st.button("🔄 Atualizar Dados", use_container_width=True):
-        st.rerun()
-        
-    if st.button("🚪 Sair / Logout", use_container_width=True):
+    if st.sidebar.button("🚪 Sair / Logout", use_container_width=True):
         st.session_state.autenticado = False
         st.session_state.usuario = ""
         st.rerun()
-    st.info("🏢 Intranet Base Stang - Itajaí SC\nStatus: Conectado 🟢")
-    
-    st.markdown("<div style='text-align: left; font-style: italic; font-size: 11px; opacity: 0.7; margin-top: 25px;'><i>By: TS tech</i></div>", unsafe_allow_html=True)
-
-if menu is not None:
-    # --- TELA 1: CRIAR NOVA O.S. ---
-    if menu == "📝 Nova O.S.":
-        st.markdown("# 📝 Abertura de Ordem de Serviço (O.S.)")
-        st.markdown("Preencha os dados abaixo para registrar a solicitação de manutenção.")
         
-        with st.form("form_nova_os", clear_on_submit=True):
-            col1, col2, col3 = st.columns(3)
+    st.sidebar.markdown("---")
+    
+    opcoes_menu = [m for m in TODOS_MENUS if m in permissoes_usuario]
+    if not opcoes_menu:
+        opcoes_menu = ["Sem Permissões"]
+        
+    menu = st.sidebar.radio("Navegação do Sistema:", opcoes_menu)
+    st.sidebar.markdown("---")
+    
+    # === REGRAS DE STATUS ===
+    def renderizar_cards_status():
+        df_os = carregar_banco_os()
+        df_compras = pd.read_csv(ARQUIVO_COMPRAS, dtype=str) if os.path.exists(ARQUIVO_COMPRAS) else pd.DataFrame()
+        
+        pend_os = len(df_os[df_os["Status"].isin(["Pendente", ""])]) if not df_os.empty else 0
+        and_os = len(df_os[df_os["Status"] == "Em Andamento"]) if not df_os.empty else 0
+        fin_os = len(df_os[df_os["Status"] == "Finalizado"]) if not df_os.empty else 0
+        
+        pend_comp = len(df_compras[df_compras["Status"].isin(["Nova Solicitação", "Pendente Assinatura Diretor"])]) if not df_compras.empty else 0
+        fin_comp = len(df_compras[df_compras["Status"] == "Compra Aprovada/Finalizada"]) if not df_compras.empty else 0
+
+        html_cards = f"""
+        <div class="status-card-container">
+            <div class="status-card"><div class="status-card-title">O.S. Pendentes</div><div class="status-card-value badge-danger">🚨 {pend_os}</div></div>
+            <div class="status-card"><div class="status-card-title">O.S. Em Andamento</div><div class="status-card-value badge-warning">⏳ {and_os}</div></div>
+            <div class="status-card"><div class="status-card-title">O.S. Finalizadas</div><div class="status-card-value badge-success">✅ {fin_os}</div></div>
+            <div class="status-card"><div class="status-card-title">Compras Pendentes</div><div class="status-card-value badge-danger">🛒 {pend_comp}</div></div>
+            <div class="status-card"><div class="status-card-title">Compras Finalizadas</div><div class="status-card-value badge-success">📦 {fin_comp}</div></div>
+        </div>
+        """
+        st.markdown(html_cards, unsafe_allow_html=True)
+    
+    # Exibe os status globais no topo de qualquer tela, exceto se for tela que ocupe muito espaço
+    if menu not in ["Sem Permissões"]:
+        renderizar_cards_status()
+        
+    # --- TELA 1: NOVA O.S. ---
+    if menu == "📝 Nova O.S.":
+        st.markdown("# 📝 Emitir Nova Ordem de Serviço")
+        with st.form("form_nova_os"):
+            col1, col2 = st.columns(2)
             with col1:
-                solicitante = st.text_input("Nome do Solicitante *")
-                setor = st.selectbox("Setor", ["OPERAÇÃO", "MANUTENÇÃO", "PORTARIA", "ADMINISTRATIVO", "TI"])
+                solicitante = st.text_input("Solicitante*", value=st.session_state.usuario)
+                setor = st.selectbox("Setor*", ["Operação", "Administrativo", "TI", "Manutenção", "Outros"])
+                equipamento = st.text_input("Equipamento (opcional)")
             with col2:
-                equipamento = st.text_input("Equipamento / Local")
-                tipo = st.selectbox("Tipo de Manutenção", ["CORRETIVA", "PREVENTIVA", "PREDITIVA"])
-            with col3:
-                prioridade = st.selectbox("Prioridade", ["BAIXA", "MÉDIA", "ALTA", "URGENTE"])
-                status = st.selectbox("Status Inicial", ["Em Aberto", "Em Andamento", "Finalizada"])
+                tipo_manutencao = st.selectbox("Tipo de Manutenção*", ["Preventiva", "Corretiva", "Melhoria"])
+                prioridade = st.selectbox("Prioridade*", ["Baixa", "Média", "Alta", "Urgente"])
+                data_criacao_input = st.date_input("Data de Criação")
+                hora_criacao_input = st.time_input("Hora de Criação", value=datetime.now().time())
                 
-            descricao = st.text_area("Descrição Detalhada do Problema *")
+            descricao = st.text_area("Descrição do Problema*", height=100)
             
-            submit = st.form_submit_button("💾 Salvar Ordem de Serviço")
+            st.markdown("---")
+            enviar = st.form_submit_button("Gerar Solicitação e O.S.", use_container_width=True)
             
-            if submit:
+            if enviar:
                 if not solicitante or not descricao:
-                    st.error("Por favor, preencha o Solicitante e a Descrição do Problema.")
+                    st.error("Preencha todos os campos obrigatórios (*).")
                 else:
-                    df = carregar_banco_os()
-                    novo_id = int(df["ID"].max() + 1) if not df.empty and df["ID"].max() > 0 else 1330
-                    
-                    finalizado_por_val = st.session_state.usuario.upper() if status == "Finalizada" else ""
-                    data_termino_val = datetime.now().strftime("%d/%m/%Y") if status == "Finalizada" else ""
-
-                    nova_linha = {
-                        "ID": str(novo_id),
-                        "Data_Criacao": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        "Solicitante": solicitante.upper(),
-                        "Setor": setor.upper(),
-                        "Equipamento": equipamento.upper() if equipamento else "NÃO INFORMADO",
-                        "Tipo_Manutencao": tipo.upper(),
-                        "Prioridade": prioridade.upper(),
-                        "Descricao": descricao.upper(),
-                        "Solucao": "ATENDIDO E FINALIZADO" if status == "Finalizada" else "EM ANDAMENTO",
-                        "Itens_Trocados": "NENHUM",
-                        "finalizado_por": finalizado_por_val,
-                        "Data_Termino": data_termino_val,
-                        "Status": status
-                    }
-                    df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
-                    df.to_csv(ARQUIVO_OS, index=False)
-                    st.success(f"Ordem de Serviço #{novo_id} gerada com sucesso!")
+                    df_os = carregar_banco_os()
+                    novo_id = df_os["ID"].max() + 1 if not df_os.empty else 1
+                    data_hora_final = f"{data_criacao_input.strftime('%d/%m/%Y')} {hora_criacao_input.strftime('%H:%M')}"
+                    nova_os = pd.DataFrame([{
+                        "ID": novo_id,
+                        "Data_Criacao": data_hora_final,
+                        "Solicitante": solicitante,
+                        "Setor": setor,
+                        "Equipamento": equipamento,
+                        "Tipo_Manutencao": tipo_manutencao,
+                        "Prioridade": prioridade,
+                        "Descricao": descricao,
+                        "Solucao": "",
+                        "Itens_Trocados": "",
+                        "finalizado_por": "",
+                        "Data_Termino": "",
+                        "Status": "Pendente"
+                    }])
+                    df_os = pd.concat([df_os, nova_os], ignore_index=True)
+                    df_os.to_csv(ARQUIVO_OS, index=False)
+                    st.success(f"✅ O.S. #{novo_id} criada com sucesso e enviada para Pendentes!")
                     st.rerun()
-
-        df_os_view = carregar_banco_os()
-        if not df_os_view.empty:
-            dias_prioridade_map = {"URGENTE": 1, "ALTA": 5, "MÉDIA": 15, "MEDIA": 15, "BAIXA": 30}
-            
-            def calcular_vencimento_os_view(row):
-                try:
-                    prio = str(row['Prioridade']).upper()
-                    dias = dias_prioridade_map.get(prio, 30)
-                    dt_criacao = pd.to_datetime(str(row['Data_Criacao']).split(" ")[0], format='%d/%m/%Y', errors='coerce')
-                    if pd.isna(dt_criacao):
-                        dt_criacao = pd.to_datetime(str(row['Data_Criacao']), errors='coerce')
-                    if pd.isna(dt_criacao):
-                        return datetime.now().date()
-                    return (dt_criacao + timedelta(days=dias)).date()
-                except:
-                    return datetime.now().date()
-
-            def determinar_status_prazo_view(row):
-                status_atual = str(row['Status']).lower()
-                if "finalizada" in status_atual or "concluída" in status_atual:
-                    return "Finalizada 🔵"
-                venc = row['Prazo_Limite']
-                hoje = datetime.now().date()
-                if hoje > venc:
-                    return "Vencida 🔴"
-                else:
-                    return "No Prazo 🟢"
-
-            df_os_view['Prazo_Limite'] = df_os_view.apply(calcular_vencimento_os_view, axis=1)
-            df_os_view['Status_Prazo'] = df_os_view.apply(determinar_status_prazo_view, axis=1)
-
-            cols_exibicao = ["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Prazo_Limite", "Status_Prazo", "Status", "Equipamento", "Descricao", "finalizado_por"]
-            st.dataframe(df_os_view[cols_exibicao].sort_values(by="ID", ascending=False), use_container_width=True)
 
     # --- TELA 2: GERENCIAR O.S. ---
     elif menu == "📋 Gerenciar O.S.":
-        st.markdown("# 📋 Painel de Controle e Gestão de O.S.")
-        df = carregar_banco_os()
+        st.markdown("# 📋 Gerenciamento de Ordens de Serviço")
+        df_os = carregar_banco_os()
         
-        if df.empty:
-            st.info("Nenhuma O.S. registrada no momento.")
+        if df_os.empty:
+            st.info("Nenhuma O.S. cadastrada.")
         else:
-            aba_os_manag1, aba_os_manag2 = st.tabs(["📋 Gerenciar O.S.", "📧 Enviar O.S. por E-mail"])
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                filtro_status = st.multiselect("Filtrar por Status", ["Pendente", "Em Andamento", "Finalizado"], default=["Pendente", "Em Andamento"])
+            with col_f2:
+                filtro_id = st.text_input("Buscar por ID da O.S. (deixe vazio para ver todas)")
+                
+            if filtro_status:
+                df_os_view = df_os[df_os["Status"].isin(filtro_status)]
+            else:
+                df_os_view = df_os
+                
+            if filtro_id.strip():
+                df_os_view = df_os_view[df_os_view["ID"].astype(str) == filtro_id.strip()]
+                
+            st.dataframe(df_os_view[["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Status"]], use_container_width=True)
             
-            # --- ABA 1: GERENCIAR O.S. ---
-            with aba_os_manag1:
-                dias_prioridade_map = {"URGENTE": 1, "ALTA": 5, "MÉDIA": 15, "MEDIA": 15, "BAIXA": 30}
-                
-                def calcular_vencimento_os(row):
-                    try:
-                        prio = str(row['Prioridade']).upper()
-                        dias = dias_prioridade_map.get(prio, 30)
-                        dt_criacao = pd.to_datetime(str(row['Data_Criacao']).split(" ")[0], format='%d/%m/%Y', errors='coerce')
-                        if pd.isna(dt_criacao):
-                            dt_criacao = pd.to_datetime(str(row['Data_Criacao']), errors='coerce')
-                        if pd.isna(dt_criacao):
-                            return datetime.now().date()
-                        return (dt_criacao + timedelta(days=dias)).date()
-                    except:
-                        return datetime.now().date()
-
-                def determinar_status_prazo(row):
-                    status_atual = str(row['Status']).lower()
-                    if "finalizada" in status_atual or "concluída" in status_atual:
-                        return "Finalizada 🔵"
-                    venc = row['Prazo_Limite']
-                    hoje = datetime.now().date()
-                    if hoje > venc:
-                        return "Vencida 🔴"
-                    else:
-                        return "No Prazo 🟢"
-
-                df['Prazo_Limite'] = df.apply(calcular_vencimento_os, axis=1)
-                df['Status_Prazo'] = df.apply(determinar_status_prazo, axis=1)
-
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    filtro_status = st.selectbox("Filtrar por Status", ["Todos"] + list(df["Status"].unique()))
-                with c2:
-                    filtro_setor = st.selectbox("Filtrar por Setor", ["Todos"] + list(df["Setor"].unique()))
-                with c3:
-                    lista_finalizado_por_opts = ["Todos"] + sorted([x for x in df["finalizado_por"].dropna().unique().tolist() if str(x).strip() != ""])
-                    filtro_finalizador = st.selectbox("Filtrar por Executante", lista_finalizado_por_opts)
-                    
-                df_filtered = df.copy()
-                if filtro_status != "Todos":
-                    df_filtered = df_filtered[df_filtered["Status"] == filtro_status]
-                if filtro_setor != "Todos":
-                    df_filtered = df_filtered[df_filtered["Setor"] == filtro_setor]
-                if filtro_finalizador != "Todos":
-                    df_filtered = df_filtered[df_filtered["finalizado_por"] == filtro_finalizador]
-                    
-                cols_exibicao = ["ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Prazo_Limite", "Status_Prazo", "Status", "Equipamento", "Solucao", "Itens_Trocados", "finalizado_por"]
-                st.dataframe(df_filtered[cols_exibicao].sort_values(by="ID", ascending=False), use_container_width=True)
-                
+            if not df_os_view.empty:
                 st.markdown("---")
+                id_selecionado = st.selectbox("Selecione o ID da O.S. para Editar/Finalizar:", df_os_view["ID"].tolist())
+                os_selecionada = df_os[df_os["ID"] == id_selecionado].iloc[0]
+                idx_selecionado = df_os[df_os["ID"] == id_selecionado].index[0]
                 
-                aba_os_ges1, aba_os_ges2 = st.tabs(["✏️ Editar / Finalizar O.S.", "🗑️ Excluir O.S."])
-                
-                with aba_os_ges1:
-                    ids_os_lista = sorted(df["ID"].tolist(), reverse=True)
-                    if ids_os_lista:
-                        os_selecionada_id = st.selectbox("Selecione o ID da O.S.", ids_os_lista)
-                        row_edit_os = df[df["ID"] == os_selecionada_id].iloc[0]
+                with st.form("form_edicao_os"):
+                    st.markdown(f"#### Editando O.S. #{id_selecionado}")
+                    col_e1, col_e2 = st.columns(2)
+                    with col_e1:
+                        novo_status = st.selectbox("Status", ["Pendente", "Em Andamento", "Finalizado"], index=["Pendente", "Em Andamento", "Finalizado"].index(os_selecionada["Status"]) if os_selecionada["Status"] in ["Pendente", "Em Andamento", "Finalizado"] else 0)
+                        edit_prioridade = st.selectbox("Prioridade", ["Baixa", "Média", "Alta", "Urgente"], index=["Baixa", "Média", "Alta", "Urgente"].index(os_selecionada["Prioridade"]) if os_selecionada["Prioridade"] in ["Baixa", "Média", "Alta", "Urgente"] else 0)
+                    with col_e2:
+                        edit_setor = st.selectbox("Setor", ["Operação", "Administrativo", "TI", "Manutenção", "Outros"], index=["Operação", "Administrativo", "TI", "Manutenção", "Outros"].index(os_selecionada["Setor"]) if os_selecionada["Setor"] in ["Operação", "Administrativo", "TI", "Manutenção", "Outros"] else 0)
+                        edit_equipamento = st.text_input("Equipamento", value=str(os_selecionada.get("Equipamento", "")))
                         
-                        with st.form("form_editar_os_detalhes"):
-                            st.subheader(f"Editando Ordem de Serviço #{os_selecionada_id}")
+                    edit_descricao = st.text_area("Descrição do Problema", value=str(os_selecionada["Descricao"]))
+                    edit_solucao = st.text_area("Descrição da Solução Aplicada", value=str(os_selecionada.get("Solucao", "")))
+                    edit_itens = st.text_input("Itens Trocados/Utilizados", value=str(os_selecionada.get("Itens_Trocados", "")))
+                    
+                    finalizado_por = st.text_input("Responsável pela Manutenção / Finalizador", value=str(os_selecionada.get("finalizado_por", st.session_state.usuario)))
+                    
+                    btn_salvar = st.form_submit_button("Salvar Alterações da O.S.", use_container_width=True)
+                    
+                    if btn_salvar:
+                        df_os.at[idx_selecionado, "Status"] = novo_status
+                        df_os.at[idx_selecionado, "Prioridade"] = edit_prioridade
+                        df_os.at[idx_selecionado, "Setor"] = edit_setor
+                        df_os.at[idx_selecionado, "Equipamento"] = edit_equipamento
+                        df_os.at[idx_selecionado, "Descricao"] = edit_descricao
+                        df_os.at[idx_selecionado, "Solucao"] = edit_solucao
+                        df_os.at[idx_selecionado, "Itens_Trocados"] = edit_itens
+                        df_os.at[idx_selecionado, "finalizado_por"] = finalizado_por
+                        
+                        if novo_status == "Finalizado" and pd.isna(df_os.at[idx_selecionado, "Data_Termino"]) or str(df_os.at[idx_selecionado, "Data_Termino"]) == "":
+                            df_os.at[idx_selecionado, "Data_Termino"] = datetime.now().strftime("%d/%m/%Y %H:%M")
                             
-                            col_e1, col_e2, col_e3 = st.columns(3)
-                            with col_e1:
-                                edit_solicitante = st.text_input("Solicitante", value=str(row_edit_os["Solicitante"]))
-                                edit_setor = st.text_input("Setor", value=str(row_edit_os["Setor"]))
-                            with col_e2:
-                                edit_equip = st.text_input("Equipamento", value=str(row_edit_os["Equipamento"]))
-                                
-                                prio_atual = str(row_edit_os["Prioridade"]).upper()
-                                idx_prio = ["BAIXA", "MÉDIA", "ALTA", "URGENTE"].index(prio_atual) if prio_atual in ["BAIXA", "MÉDIA", "ALTA", "URGENTE"] else 0
-                                edit_prio = st.selectbox("Prioridade", ["BAIXA", "MÉDIA", "ALTA", "URGENTE"], index=idx_prio)
-                            with col_e3:
-                                status_atual_str = str(row_edit_os["Status"])
-                                status_opcoes = ["Em Aberto", "Em Andamento", "Finalizada"]
-                                idx_st = status_opcoes.index(status_atual_str) if status_atual_str in status_opcoes else 0
-                                edit_status = st.selectbox("Status", status_opcoes, index=idx_st)
-                                
-                                finalizado_por_ant = str(row_edit_os["finalizado_por"]) if pd.notna(row_edit_os["finalizado_por"]) and str(row_edit_os["finalizado_por"]).strip() != "" else st.session_state.usuario.upper()
-                                edit_finalizado_por = st.text_input("Responsável pelo serviço", value=finalizado_por_ant)
+                        df_os.to_csv(ARQUIVO_OS, index=False)
+                        st.success(f"O.S. #{id_selecionado} atualizada com sucesso!")
+                        st.rerun()
 
-                            edit_desc = st.text_area("Descrição do Problema", value=str(row_edit_os["Descricao"]))
-                            
-                            col_e4, col_e5 = st.columns(2)
-                            with col_e4:
-                                sol_ant = str(row_edit_os["Solucao"]) if pd.notna(row_edit_os["Solucao"]) else ""
-                                edit_solucao = st.text_area("Solução Aplicada", value=sol_ant)
-                            with col_e5:
-                                itens_ant = str(row_edit_os["Itens_Trocados"]) if pd.notna(row_edit_os["Itens_Trocados"]) else ""
-                                edit_itens = st.text_area("Itens / Peças Trocadas", value=itens_ant)
-                                
-                            col_b_f1, col_b_f2 = st.columns(2)
-                            with col_b_f1:
-                                btn_salvar_alt = st.form_submit_button("💾 Salvar Alterações")
-                            with col_b_f2:
-                                btn_finalizar_direto = st.form_submit_button("✅ Finalizar O.S. Imediatamente")
-                                
-                            if btn_salvar_alt:
-                                df.loc[df["ID"] == os_selecionada_id, "Solicitante"] = edit_solicitante.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Setor"] = edit_setor.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Equipamento"] = edit_equip.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Prioridade"] = edit_prio.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Status"] = edit_status
-                                df.loc[df["ID"] == os_selecionada_id, "Descricao"] = edit_desc.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Solucao"] = edit_solucao.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "Itens_Trocados"] = edit_itens.upper()
-                                df.loc[df["ID"] == os_selecionada_id, "finalizado_por"] = edit_finalizado_por.upper()
-                                
-                                if edit_status == "Finalizada":
-                                    df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = datetime.now().strftime("%d/%m/%Y")
-                                else:
-                                    df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = ""
-                                
-                                df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
-                                df_to_save.to_csv(ARQUIVO_OS, index=False)
-                                st.success(f"Ordem de Serviço #{os_selecionada_id} atualizada com sucesso!")
-                                st.rerun()
-                                
-                            if btn_finalizar_direto:
-                                df.loc[df["ID"] == os_selecionada_id, "Status"] = "Finalizada"
-                                df.loc[df["ID"] == os_selecionada_id, "Data_Termino"] = datetime.now().strftime("%d/%m/%Y")
-                                df.loc[df["ID"] == os_selecionada_id, "finalizado_por"] = edit_finalizado_por.upper()
-                                if str(df.loc[df["ID"] == os_selecionada_id, "Solucao"].values[0]) in ["", "EM ANDAMENTO", "nan"]:
-                                    df.loc[df["ID"] == os_selecionada_id, "Solucao"] = "ATENDIDO E FINALIZADO"
-                                    
-                                df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
-                                df_to_save.to_csv(ARQUIVO_OS, index=False)
-                                st.success(f"Ordem de Serviço #{os_selecionada_id} finalizada com sucesso!")
-                                st.rerun()
-                
-                with aba_os_ges2:
-                    col_del1, col_del2 = st.columns([2, 1])
-                    with col_del1:
-                        os_para_excluir = st.selectbox("Selecione o ID da O.S. para Exclusão", df["ID"].tolist(), key="select_del_os")
-                    with col_del2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("🗑️ Excluir O.S. Selecionada", type="primary"):
-                            df = df[df["ID"] != os_para_excluir]
-                            df_to_save = df.drop(columns=["Prazo_Limite", "Status_Prazo"], errors="ignore")
-                            df_to_save.to_csv(ARQUIVO_OS, index=False)
-                            st.success(f"Ordem de Serviço #{os_para_excluir} excluída!")
-                            st.rerun()
-
-            # --- ABA 2: ENVIAR O.S. POR E-MAIL ---
-            with aba_os_manag2:
-                st.markdown("### 📧 Enviar Ordens de Serviço por E-mail")
-                
-                df_send = df.copy()
-                df_send['Dt_Parsed'] = pd.to_datetime(df_send['Data_Criacao'], format='%d/%m/%Y %H:%M', errors='coerce')
-                if df_send['Dt_Parsed'].isna().all():
-                    df_send['Dt_Parsed'] = pd.to_datetime(df_send['Data_Criacao'], errors='coerce')
-                
-                df_send['Ano'] = df_send['Dt_Parsed'].dt.year
-                df_send['Mes_Ano'] = df_send['Dt_Parsed'].dt.strftime('%m/%Y')
-                df_send['Dia'] = df_send['Dt_Parsed'].dt.date
-                
-                # Filtros globais: número, setor e dia, mês, ano
-                fg_col1, fg_col2, fg_col3, fg_col4, fg_col5 = st.columns(5)
-                
-                with fg_col1:
-                    num_opts = ["Todos"] + sorted(df_send['ID'].astype(str).unique().tolist(), key=lambda x: int(x) if x.isdigit() else x)
-                    f_num = st.selectbox("Número (ID)", num_opts, key="send_f_num")
-                with fg_col2:
-                    setor_opts = ["Todos"] + sorted([s for s in df_send['Setor'].dropna().unique().tolist() if str(s).strip() != ""])
-                    f_setor = st.selectbox("Setor", setor_opts, key="send_f_setor")
-                with fg_col3:
-                    dias_opts = ["Todos"] + sorted([str(d) for d in df_send['Dia'].dropna().unique().tolist()])
-                    f_dia = st.selectbox("Dia Exato", dias_opts, key="send_f_dia")
-                with fg_col4:
-                    meses_opts = ["Todos"] + sorted([str(m) for m in df_send['Mes_Ano'].dropna().unique().tolist()])
-                    f_mes = st.selectbox("Mês/Ano", meses_opts, key="send_f_mes")
-                with fg_col5:
-                    anos_opts = ["Todos"] + sorted([str(int(a)) for a in df_send['Ano'].dropna().unique() if pd.notna(a)])
-                    f_ano = st.selectbox("Ano", anos_opts, key="send_f_ano")
-                    
-                if f_num != "Todos":
-                    df_send = df_send[df_send['ID'].astype(str) == f_num]
-                if f_setor != "Todos":
-                    df_send = df_send[df_send['Setor'] == f_setor]
-                if f_dia != "Todos":
-                    df_send = df_send[df_send['Dia'].astype(str) == f_dia]
-                if f_mes != "Todos":
-                    df_send = df_send[df_send['Mes_Ano'] == f_mes]
-                if f_ano != "Todos":
-                    df_send = df_send[df_send['Ano'].astype(str) == f_ano]
-                    
-                st.markdown("---")
-                
-                col_m_left, col_m_right = st.columns([1.3, 1])
-                
-                with col_m_left:
-                    st.markdown("#### 1. Selecione as Ordens de Serviço")
-                    if df_send.empty:
-                        st.info("Nenhuma O.S. encontrada para os filtros aplicados.")
-                        os_selecionadas_ids = []
-                    else:
-                        df_send['Selecionar'] = False
-                        edited_df = st.data_editor(
-                            df_send[["Selecionar", "ID", "Data_Criacao", "Solicitante", "Setor", "Prioridade", "Status"]],
-                            hide_index=True,
-                            use_container_width=True,
-                            key="editor_os_email"
-                        )
-                        os_selecionadas_ids = edited_df[edited_df['Selecionar'] == True]['ID'].tolist()
-                        st.caption(f"Total de O.S. selecionadas: **{len(os_selecionadas_ids)}**")
-
-                with col_m_right:
-                    st.markdown("#### 2. Janela de Envio por E-mail")
-                    
-                    df_u_send = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                    row_logged_send = df_u_send[df_u_send["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                    email_user_default = ""
-                    if not row_logged_send.empty:
-                        email_user_default = str(row_logged_send.iloc[0].get("Email_Usuario", ""))
-
-                    with st.form("form_janela_envio_os_email"):
-                        para_input = st.text_input("Para:", value=email_user_default if email_user_default else "financeiro@stang.com.br")
-                        assunto_input = st.text_input("Assunto:", value="Envio de Ordens de Serviço - Intranet Stang")
-                        
-                        corpo_padrao = "Prezado(a),\n\nSegue(m) em anexo a(s) Ordem(ns) de Serviço solicitada(s) em formato PDF.\n\nAtenciosamente,\nEquipe de Manutenção Stang"
-                        mensagem_input = st.text_area("Mensagem:", value=corpo_padrao, height=140)
-                        
-                        btn_disparar_email = st.form_submit_button("🚀 Enviar E-mail", use_container_width=True)
-                        
-                        if btn_disparar_email:
-                            if not para_input:
-                                st.error("Informe o e-mail do destinatário.")
-                            elif not os_selecionadas_ids:
-                                st.warning("Selecione pelo menos uma Ordem de Serviço na tabela ao lado para enviar.")
-                            elif not HAS_PDF_LIBS:
-                                st.error("Bibliotecas de PDF (reportlab / pypdf) não estão instaladas no servidor!")
-                            else:
-                                if row_logged_send.empty:
-                                    st.error("Configurações do usuário não foram encontradas.")
-                                else:
-                                    u_dict = row_logged_send.iloc[0].to_dict()
-                                    cfg_mail = {
-                                        "Email_Remetente": u_dict.get("Email_Usuario", ""),
-                                        "Senha_App": u_dict.get("Senha_App_Email", ""),
-                                        "Servidor_SMTP": u_dict.get("Servidor_SMTP", "smtp.gmail.com"),
-                                        "Porta_SMTP": u_dict.get("Porta_SMTP", "587"),
-                                        "Nome_Remetente": st.session_state.usuario
-                                    }
-                                    
-                                    anexos_os_envio = []
-                                    
-                                    for os_id_item in os_selecionadas_ids:
-                                        row_os_match = df[df["ID"] == os_id_item].iloc[0]
-                                        pdf_bytes = gerar_pdf_os(row_os_match)
-                                        if pdf_bytes:
-                                            nome_arquivo_anexo = f"OS_{os_id_item}.pdf"
-                                            anexos_os_envio.append((pdf_bytes, nome_arquivo_anexo))
-                                    
-                                    sucesso_send, msg_send = enviar_email_real(
-                                        destinatario=para_input,
-                                        assunto=assunto_input,
-                                        corpo=mensagem_input,
-                                        anexos=anexos_os_envio,
-                                        config=cfg_mail
-                                    )
-                                    
-                                    if sucesso_send:
-                                        st.success(f"E-mail enviado com sucesso para {para_input} com o(s) PDF(s) anexado(s)!")
-                                    else:
-                                        st.error(f"Erro ao enviar e-mail: {msg_send}")
-
-    # --- TELA 3: IMPRIMIR O.S. ---
+    # --- TELA 3: IMPRIMIR / RELATÓRIOS ---
     elif menu == "🖨️ Imprimir O.S.":
         st.markdown("# 🖨️ Emissão e Relatórios de O.S.")
-        df = carregar_banco_os()
+        df_os = carregar_banco_os()
         
-        if df.empty:
-            st.warning("Não há O.S. cadastradas para impressão.")
-        else:
-            tab_imp1, tab_imp2 = st.tabs(["📄 Imprimir O.S.", "📊 Relatório Geral de O.S."])
-            
-            with tab_imp1:
-                lista_os = df["ID"].astype(str) + " - " + df["Solicitante"] + " (" + df["Setor"] + ")"
-                os_selecionada = st.selectbox("Selecione a O.S. desejada:", lista_os)
+        tab_imp1, tab_imp2 = st.tabs(["🖨️ Imprimir O.S. Individual", "📊 Relatório Geral de O.S."])
+        
+        with tab_imp1:
+            if df_os.empty:
+                st.info("Nenhuma O.S. cadastrada para imprimir.")
+            else:
+                lista_ids_impressao = sorted(df_os["ID"].astype(int).tolist(), reverse=True)
+                id_imp = st.selectbox("Selecione a O.S. para gerar o espelho de impressão:", lista_ids_impressao)
                 
-                id_selecionado = int(os_selecionada.split(" - ")[0])
-                os_row = df[df["ID"] == id_selecionado].iloc[0]
+                os_imprimir = df_os[df_os["ID"] == id_imp].iloc[0]
                 
-                st.markdown("---")
+                st.markdown("### 📄 Visualização do Documento Físico:")
+                html_print = gerar_html_os_impressao(os_imprimir)
                 
-                print_html = gerar_html_os_impressao(os_row)
-                components.html(print_html, height=920, scrolling=True)
-
-            with tab_imp2:
-                st.subheader("Filtros para o Relatório de Ordens de Serviço (O.S.)")
-                df_rel_os = df.copy()
-                df_rel_os['Dt_Parsed'] = pd.to_datetime(df_rel_os['Data_Criacao'], format='%d/%m/%Y %H:%M', errors='coerce')
-                if df_rel_os['Dt_Parsed'].isna().all():
-                    df_rel_os['Dt_Parsed'] = pd.to_datetime(df_rel_os['Data_Criacao'], errors='coerce')
+                with st.expander("👁️ Abrir Visualização / Impressão no Navegador"):
+                    components.html(html_print, height=800, scrolling=True)
                 
-                df_rel_os['Ano'] = df_rel_os['Dt_Parsed'].dt.year
-                df_rel_os['Mes_Ano'] = df_rel_os['Dt_Parsed'].dt.strftime('%m/%Y')
-                df_rel_os['Dia'] = df_rel_os['Dt_Parsed'].dt.date
+                if HAS_PDF_LIBS:
+                    st.markdown("---")
+                    st.markdown("### 📥 Gerar Arquivo PDF Oficial (Com Cabeçalho Automático)")
+                    pdf_bytes = gerar_pdf_os(os_imprimir)
+                    if pdf_bytes:
+                        st.download_button(
+                            label=f"💾 Baixar PDF da O.S. #{id_imp}",
+                            data=pdf_bytes,
+                            file_name=f"OS_{id_imp}_Stang.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+        
+        with tab_imp2:
+            st.markdown("### 📊 Gerar Relatório de O.S.")
+            if df_os.empty:
+                st.info("Nenhum dado.")
+            else:
+                c_rel1, c_rel2 = st.columns(2)
+                f_rel_setor = c_rel1.selectbox("Filtro Setor", ["Todos"] + df_os["Setor"].unique().tolist())
+                f_rel_status = c_rel2.selectbox("Filtro Status", ["Todos"] + df_os["Status"].unique().tolist())
                 
-                col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-                with col_f1:
-                    status_opts = ["Todos"] + sorted(df_rel_os['Status'].dropna().unique().tolist())
-                    filtro_status_rep = st.selectbox("Status", status_opts, key="rep_status")
-                with col_f2:
-                    anos_opts = ["Todos"] + sorted([str(int(a)) for a in df_rel_os['Ano'].dropna().unique() if pd.notna(a)])
-                    filtro_ano_rep = st.selectbox("Ano", anos_opts, key="rep_ano")
-                with col_f3:
-                    meses_opts = ["Todos"] + sorted(df_rel_os['Mes_Ano'].dropna().unique().tolist())
-                    filtro_mes_rep = st.selectbox("Mês/Ano", meses_opts, key="rep_mes")
-                with col_f4:
-                    dias_opts = ["Todos"] + sorted(df_rel_os['Dia'].astype(str).dropna().unique().tolist())
-                    filtro_dia_rep = st.selectbox("Dia Exato", dias_opts, key="rep_dia")
-                
-                df_f_rep = df_rel_os.copy()
-                if filtro_status_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Status'] == filtro_status_rep]
-                if filtro_ano_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Ano'].astype(str) == filtro_ano_rep]
-                if filtro_mes_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Mes_Ano'] == filtro_mes_rep]
-                if filtro_dia_rep != "Todos":
-                    df_f_rep = df_f_rep[df_f_rep['Dia'].astype(str) == filtro_dia_rep]
-                
-                st.markdown("---")
-                st.markdown(f"**Total de O.S. encontradas:** {len(df_f_rep)}")
+                df_f_rep = df_os.copy()
+                if f_rel_setor != "Todos":
+                    df_f_rep = df_f_rep[df_f_rep["Setor"] == f_rel_setor]
+                if f_rel_status != "Todos":
+                    df_f_rep = df_f_rep[df_f_rep["Status"] == f_rel_status]
+                    
+                st.metric("Total de O.S. no Filtro", len(df_f_rep))
                 
                 if not df_f_rep.empty:
                     st.dataframe(df_f_rep[["ID", "Data_Criacao", "Solicitante", "Setor", "Equipamento", "Tipo_Manutencao", "Prioridade", "Status", "Solucao", "finalizado_por"]], use_container_width=True)
+                    
+                    # CÓDIGO INSERIDO: Opção de imprimir relatório geral de O.S.
+                    linhas_html = ""
+                    for _, r in df_f_rep.iterrows():
+                        linhas_html += f"<tr><td style='padding:5px; border:1px solid #ddd;'>{r['ID']}</td><td style='padding:5px; border:1px solid #ddd;'>{r.get('Data_Criacao', '')}</td><td style='padding:5px; border:1px solid #ddd;'>{r.get('Solicitante', '')}</td><td style='padding:5px; border:1px solid #ddd;'>{r.get('Setor', '')}</td><td style='padding:5px; border:1px solid #ddd;'>{r.get('Status', '')}</td></tr>"
+                    
+                    html_relatorio = f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <style>
+                            body {{ font-family: Arial, sans-serif; padding: 20px; }}
+                            .print-btn {{ background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-bottom: 20px; }}
+                            @media print {{ 
+                                .print-btn {{ display: none !important; }} 
+                                body {{ padding: 0; background-color: #ffffff; color: #000000; }}
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        <div style="text-align: center;">
+                            <button class="print-btn" onclick="window.print()">🖨️ Imprimir Relatório Geral de O.S.</button>
+                        </div>
+                        <h3 style="text-align: center;">Relatório Geral de Ordens de Serviço</h3>
+                        <p style="text-align: center;"><b>Filtros aplicados:</b> Setor ({f_rel_setor}) | Status ({f_rel_status})</p>
+                        <table style="width:100%; border-collapse: collapse; text-align: left; font-size: 12px; border: 1px solid #000;">
+                            <tr style="background-color: #e0e0e0;">
+                                <th style="padding:8px; border:1px solid #000;">ID</th>
+                                <th style="padding:8px; border:1px solid #000;">Data</th>
+                                <th style="padding:8px; border:1px solid #000;">Solicitante</th>
+                                <th style="padding:8px; border:1px solid #000;">Setor</th>
+                                <th style="padding:8px; border:1px solid #000;">Status</th>
+                            </tr>
+                            {linhas_html}
+                        </table>
+                    </body>
+                    </html>
+                    """
+                    with st.expander("🖨️ Abrir Visualização e Imprimir Relatório"):
+                        components.html(html_relatorio, height=600, scrolling=True)
 
-    # --- TELA 4: FORMULÁRIOS E PRAZOS (FMS) ---
+    # --- TELA 4: FMs (FORMULÁRIOS) ---
     elif menu == "📅 Formulários e Prazos (FMs)":
         st.markdown("# 📅 Gestão de Conformidade de Formulários (FMs)")
-        tab_fm1, tab_fm2, tab_fm3 = st.tabs(["➕ Registrar / 🔄 Renovar FM", "🗑️ Excluir FM", "📊 Painel de Prazos e Status"])
         
-        dias_dict = {
-            "Diário (1 dia)": 1,
-            "Semanal (7 dias)": 7, 
-            "Quinzenal (15 dias)": 15, 
-            "Mensal (30 dias)": 30, 
-            "Bimestral (60 dias)": 60,
-            "Trimestral (90 dias)": 90,
-            "Semestral (180 dias)": 180
-        }
+        df_fms = pd.read_csv(ARQUIVO_FMS, dtype=str) if os.path.exists(ARQUIVO_FMS) else pd.DataFrame(columns=["FM", "Data_Realizada", "Periodo", "Dias_Prazo"])
+        
+        tab_fm1, tab_fm2, tab_fm3 = st.tabs(["➕ Lançar / Atualizar FM", "📜 Histórico de FMs", "⏰ Painel de Prazos e Status"])
         
         with tab_fm1:
-            col_f_reg1, col_f_reg2 = st.columns(2)
-            
-            with col_f_reg1:
-                st.subheader("Registrar Novo FM")
-                with st.form("form_fm_stang", clear_on_submit=True):
-                    fm_nome = st.text_input("Nome/Código do FM (Ex: FM 01 - Gerador)")
-                    data_realizada = st.date_input("Data de Realização", value=datetime.now())
-                    periodo_nome = st.selectbox("Período de Vencimento", list(dias_dict.keys()))
-                    
-                    if st.form_submit_button("Salvar e Calcular Prazo", use_container_width=True):
-                        if not fm_nome:
-                            st.error("Preencha o nome do FM!")
-                        else:
-                            df_fms = pd.read_csv(ARQUIVO_FMS, dtype=str)
-                            nova_fm = {
-                                "FM": fm_nome.upper(), 
-                                "Data_Realizada": str(data_realizada), 
-                                "Periodo": periodo_nome, 
-                                "Dias_Prazo": str(dias_dict[periodo_nome])
-                            }
-                            df_fms = df_fms[df_fms["FM"].str.upper() != fm_nome.strip().upper()]
-                            df_fms = pd.concat([df_fms, pd.DataFrame([nova_fm])], ignore_index=True)
-                            df_fms.to_csv(ARQUIVO_FMS, index=False)
-                            st.success(f"Formulário '{fm_nome.upper()}' cadastrado com sucesso!")
-                            st.rerun()
-                            
-            with col_f_reg2:
-                st.subheader("🔄 Renovar FM")
-                df_fms_existente = pd.read_csv(ARQUIVO_FMS, dtype=str)
-                if df_fms_existente.empty:
-                    st.info("Nenhum FM cadastrado para renovar.")
-                else:
-                    lista_fms_cadastrados = df_fms_existente["FM"].unique().tolist()
-                    fm_escolhido = st.selectbox("Selecione o FM que foi refeito", lista_fms_cadastrados, key="select_fm_renovacao")
-                    
-                    row_fm_ant = df_fms_existente[df_fms_existente["FM"] == fm_escolhido]
-                    per_ant_idx = 0
-                    if not row_fm_ant.empty:
-                        p_str = str(row_fm_ant.iloc[0]["Periodo"])
-                        if p_str in list(dias_dict.keys()):
-                            per_ant_idx = list(dias_dict.keys()).index(p_str)
-                            
-                    with st.form("form_renovar_fm"):
-                        nova_data_realizada = st.date_input("Nova Data de Realização", value=datetime.now())
-                        novo_periodo_nome = st.selectbox("Período de Vencimento", list(dias_dict.keys()), index=per_ant_idx)
-                        
-                        btn_renovar = st.form_submit_button("🔄 Atualizar Vencimento", use_container_width=True)
-                        
-                        if btn_renovar:
-                            df_fms_existente.loc[df_fms_existente["FM"] == fm_escolhido, "Data_Realizada"] = str(nova_data_realizada)
-                            df_fms_existente.loc[df_fms_existente["FM"] == fm_escolhido, "Periodo"] = novo_periodo_nome
-                            df_fms_existente.loc[df_fms_existente["FM"] == fm_escolhido, "Dias_Prazo"] = str(dias_dict[novo_periodo_nome])
-                            
-                            df_fms_existente.to_csv(ARQUIVO_FMS, index=False)
-                            st.success(f"FM '{fm_escolhido}' atualizado com sucesso!")
-                            st.rerun()
-
-        with tab_fm2:
-            st.subheader("🗑️ Excluir Formulário (FM)")
-            df_fms_exc = pd.read_csv(ARQUIVO_FMS, dtype=str)
-            if df_fms_exc.empty:
-                st.info("Nenhum FM cadastrado.")
-            else:
-                lista_fms_exc = sorted(df_fms_exc["FM"].unique().tolist())
-                with st.form("form_excluir_fm"):
-                    fm_para_excluir = st.selectbox("Selecione o FM que deseja excluir", lista_fms_exc)
-                    btn_conf_exc_fm = st.form_submit_button("🗑️ Excluir FM Selecionado", type="primary", use_container_width=True)
-                    
-                    if btn_conf_exc_fm:
-                        df_fms_exc = df_fms_exc[df_fms_exc["FM"] != fm_para_excluir]
-                        df_fms_exc.to_csv(ARQUIVO_FMS, index=False)
-                        st.success(f"Formulário '{fm_para_excluir}' excluído com sucesso!")
-                        st.rerun()
-
-        with tab_fm3:
-            st.subheader("Painel de Prazos e Status dos FMs")
-            df_fms = pd.read_csv(ARQUIVO_FMS, dtype=str)
-            if not df_fms.empty:
-                hoje = datetime.now().date()
-                df_fms['Data_Realizada'] = pd.to_datetime(df_fms['Data_Realizada']).dt.date
-                df_fms['Dias_Prazo_int'] = pd.to_numeric(df_fms['Dias_Prazo'], errors='coerce').fillna(0).astype(int)
-                df_fms['Vencimento'] = df_fms.apply(lambda row: row['Data_Realizada'] + timedelta(days=int(row['Dias_Prazo_int'])), axis=1)
-                df_fms['Dias_Restantes'] = df_fms['Vencimento'].apply(lambda x: (x - hoje).days)
-                df_fms['Status'] = df_fms['Dias_Restantes'].apply(lambda x: "Atrasado 🔴" if x < 0 else "No Prazo 🟢")
+            st.markdown("### Atualizar preenchimento de FM")
+            with st.form("form_fm"):
+                col_fm1, col_fm2 = st.columns(2)
+                fms_disponiveis = [f"FM {str(i).zfill(2)}" for i in range(1, 21)]
+                fm_sel = col_fm1.selectbox("Selecione o FM", fms_disponiveis)
+                dt_realizada = col_fm2.date_input("Data da última realização / conferência")
                 
-                st.dataframe(df_fms[["FM", "Data_Realizada", "Periodo", "Vencimento", "Dias_Restantes", "Status"]], use_container_width=True)
+                periodo_sel = st.selectbox("Período de Validade (Obrigatório)", ["Diário", "Semanal", "Mensal", "Trimestral", "Semestral", "Anual"])
+                
+                mapa_dias = {"Diário": 1, "Semanal": 7, "Mensal": 30, "Trimestral": 90, "Semestral": 180, "Anual": 365}
+                dias_prazo = mapa_dias[periodo_sel]
+                
+                btn_fm = st.form_submit_button("Lançar / Atualizar", use_container_width=True)
+                
+                if btn_fm:
+                    nova_linha = pd.DataFrame([{
+                        "FM": fm_sel,
+                        "Data_Realizada": dt_realizada.strftime('%d/%m/%Y'),
+                        "Periodo": periodo_sel,
+                        "Dias_Prazo": str(dias_prazo)
+                    }])
+                    df_fms = pd.concat([df_fms, nova_linha], ignore_index=True)
+                    df_fms.to_csv(ARQUIVO_FMS, index=False)
+                    st.success(f"{fm_sel} lançado com sucesso!")
+                    st.rerun()
+                    
+        with tab_fm2:
+            st.dataframe(df_fms, use_container_width=True)
+            if not df_fms.empty and is_admin_usuario:
+                if st.button("Limpar Histórico de FMs (CUIDADO)"):
+                    pd.DataFrame(columns=["FM", "Data_Realizada", "Periodo", "Dias_Prazo"]).to_csv(ARQUIVO_FMS, index=False)
+                    st.success("Histórico apagado!")
+                    st.rerun()
+                    
+        with tab_fm3:
+            st.markdown("### Status Atual e Vencimentos")
+            if df_fms.empty:
+                st.info("Nenhum FM cadastrado para cálculo de prazos.")
+            else:
+                fms_unicos = df_fms.sort_values(by="Data_Realizada", ascending=True).drop_duplicates(subset=["FM"], keep="last").copy()
+                
+                def calcular_status(row):
+                    try:
+                        dt_real = datetime.strptime(row["Data_Realizada"], '%d/%m/%Y').date()
+                        dt_venc = dt_real + timedelta(days=int(row["Dias_Prazo"]))
+                        dias_faltam = (dt_venc - datetime.now().date()).days
+                        
+                        if dias_faltam < 0:
+                            return pd.Series([dt_venc.strftime('%d/%m/%Y'), f"Atrasado ({-dias_faltam} dias)", dias_faltam])
+                        elif dias_faltam <= 3:
+                            return pd.Series([dt_venc.strftime('%d/%m/%Y'), f"Vence em {dias_faltam} dias (ALERTA)", dias_faltam])
+                        else:
+                            return pd.Series([dt_venc.strftime('%d/%m/%Y'), f"No prazo ({dias_faltam} dias)", dias_faltam])
+                    except Exception as e:
+                        return pd.Series(["Erro", "Erro na Data", 0])
+                
+                fms_unicos[["Proximo_Vencimento", "Status_Prazo", "Dias_Restantes"]] = fms_unicos.apply(calcular_status, axis=1)
+                
+                st.dataframe(fms_unicos[["FM", "Data_Realizada", "Periodo", "Proximo_Vencimento", "Status_Prazo"]], use_container_width=True)
+                
+                # CÓDIGO INSERIDO: Gráfico FM x Dias Restantes
+                st.markdown("### 📊 Relação: FM x Dias Restantes")
+                df_fms_chart = fms_unicos.copy()
+                df_fms_chart['Cor'] = df_fms_chart['Dias_Restantes'].apply(lambda x: '#ff4b4b' if x < 0 else '#00ffaa')
+                
+                fig_fm = px.bar(
+                    df_fms_chart, 
+                    x='FM', 
+                    y='Dias_Restantes', 
+                    text='Dias_Restantes',
+                    title='Dias Restantes para Vencimento de cada FM'
+                )
+                fig_fm.update_traces(marker_color=df_fms_chart['Cor'], textposition='outside')
+                fig_fm.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)', 
+                    font=dict(color='white')
+                )
+                st.plotly_chart(fig_fm, use_container_width=True)
 
     # --- TELA 5: SOLICITAÇÕES DE COMPRAS ---
     elif menu == "🛒 Solicitações de Compras":
-        st.markdown("# 🛒 Solicitações de Materiais e Insumos")
+        st.markdown("# 🛒 Solicitações de Compras de Materiais")
         
-        if "carrinho_compras" not in st.session_state:
-            st.session_state.carrinho_compras = []
+        df_compras = pd.read_csv(ARQUIVO_COMPRAS, dtype=str) if os.path.exists(ARQUIVO_COMPRAS) else pd.DataFrame(columns=[
+            "ID_Compra", "Data_Solicitacao", "Solicitante", "Setor", "Categoria", 
+            "Item", "Quantidade", "Observacoes", "Status", "Orcamento_Assinado",
+            "NF_Anexada", "Boleto_Anexado", "Assinado_Por"
+        ])
+        
+        tab_c1, tab_c2, tab_c3, tab_c4, tab_c5 = st.tabs([
+            "📝 Nova Solicitação", 
+            "📋 Gerenciar Compras", 
+            "📎 Anexar NF e Boleto", 
+            "✍️ Painel de Assinaturas (NF e Boleto)",
+            "🖨️ Imprimir Espelho de Compra"
+        ])
+        
+        with tab_c1:
+            st.markdown("### Cadastrar Nova Necessidade de Compra")
+            with st.form("form_nova_compra"):
+                c_c1, c_c2 = st.columns(2)
+                solic_c = c_c1.text_input("Solicitante", value=st.session_state.usuario)
+                setor_c = c_c2.selectbox("Setor Destino", ["Operação", "Administrativo", "TI", "Manutenção", "Cozinha", "Frota", "Outros"])
+                
+                cat_c = st.selectbox("Categoria do Item", ["Peças de Manutenção", "EPIs", "Material de Escritório", "Alimentação", "Produtos de Limpeza", "Serviços Terceirizados", "Outros"])
+                
+                st.markdown("#### Lista de Itens (Adicione os itens separando por linha se houver mais de um)")
+                itens_c = st.text_area("Descreva os itens e especificações (Ex: 1x Parafuso sextavado 10mm \n2x Luvas de couro)")
+                
+                obs_c = st.text_area("Observações (Fornecedor sugerido, urgência, etc.)")
+                
+                arquivo_orcamento = st.file_uploader("Anexar Orçamento (PDF, JPG, PNG) - Opcional para solicitar, obrigatório para aprovar", type=['pdf', 'png', 'jpg', 'jpeg'], key="up_orcamento_novo")
+                
+                btn_compra = st.form_submit_button("Gerar Solicitação de Compra", use_container_width=True)
+                
+                if btn_compra:
+                    if not solic_c or not itens_c:
+                        st.error("Preencha solicitante e a descrição dos itens.")
+                    else:
+                        n_id_c = 1
+                        if not df_compras.empty:
+                            n_id_c = df_compras["ID_Compra"].astype(int).max() + 1
+                            
+                        path_orc = "None"
+                        if arquivo_orcamento is not None:
+                            ext_orc = os.path.splitext(arquivo_orcamento.name)[1]
+                            path_orc = os.path.join("uploads_orcamentos", f"orc_{n_id_c}_solic{ext_orc}")
+                            with open(path_orc, "wb") as f_o:
+                                f_o.write(arquivo_orcamento.read())
+                                
+                        nova_compra = pd.DataFrame([{
+                            "ID_Compra": str(n_id_c),
+                            "Data_Solicitacao": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "Solicitante": solic_c,
+                            "Setor": setor_c,
+                            "Categoria": cat_c,
+                            "Item": itens_c.replace("\n", " | "),
+                            "Quantidade": "Ver descrição",
+                            "Observacoes": obs_c,
+                            "Status": "Nova Solicitação",
+                            "Orcamento_Assinado": path_orc,
+                            "NF_Anexada": "None",
+                            "Boleto_Anexado": "None",
+                            "Assinado_Por": "None"
+                        }])
+                        df_compras = pd.concat([df_compras, nova_compra], ignore_index=True)
+                        df_compras.to_csv(ARQUIVO_COMPRAS, index=False)
+                        st.success(f"Solicitação #{n_id_c} gerada com sucesso!")
+                        st.rerun()
+
+        with tab_c2:
+            st.markdown("### Gerenciamento e Aprovação (Fluxo Principal)")
             
-        if is_user_admin:
-            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação", "🖨️ Imprimir Ordem de Compra", "✍️ Assinaturas (Admin)"])
-            tab_comp1, tab_comp2, tab_comp3, tab_comp4 = abas_compras
-        else:
-            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação", "🖨️ Imprimir Ordem de Compra"])
-            tab_comp1, tab_comp2, tab_comp3 = abas_compras
-        
-        with tab_comp1:
-            st.markdown("### Gerenciar Solicitações e Anexar Orçamento")
-            df_ger_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-            if df_ger_c.empty:
-                st.info("Nenhuma solicitação de compra cadastrada.")
+            c_f_c1, c_f_c2 = st.columns(2)
+            f_stat_c = c_f_c1.selectbox("Filtrar por Status", ["Todos", "Nova Solicitação", "Pendente Assinatura Diretor", "Compra Autorizada", "Aguardando Entrega/NF", "Compra Aprovada/Finalizada", "Cancelada"])
+            f_id_c = c_f_c2.text_input("Buscar ID Compra")
+            
+            df_c_view = df_compras.copy()
+            if f_stat_c != "Todos":
+                df_c_view = df_c_view[df_c_view["Status"] == f_stat_c]
+            if f_id_c:
+                df_c_view = df_c_view[df_c_view["ID_Compra"] == f_id_c]
+                
+            st.dataframe(df_c_view[["ID_Compra", "Data_Solicitacao", "Solicitante", "Setor", "Categoria", "Status", "Orcamento_Assinado"]], use_container_width=True)
+            
+            if not df_c_view.empty:
+                st.markdown("---")
+                id_sel_c = st.selectbox("Selecione o ID para Gerenciar/Atualizar Status:", df_c_view["ID_Compra"].tolist(), key="sel_id_gerenciar")
+                idx_c = df_compras[df_compras["ID_Compra"] == id_sel_c].index[0]
+                row_c = df_compras.iloc[idx_c]
+                
+                st.markdown(f"**Itens Solicitados:** {row_c['Item']}")
+                st.markdown(f"**Observações:** {row_c.get('Observacoes', '')}")
+                exibir_documento(row_c.get("Orcamento_Assinado", "None"), "Orçamento Anexado Original")
+                
+                with st.form("form_atualiza_compra"):
+                    st.markdown(f"#### Alterar Status da Compra #{id_sel_c}")
+                    
+                    lista_status = ["Nova Solicitação", "Pendente Assinatura Diretor", "Compra Autorizada", "Aguardando Entrega/NF", "Compra Aprovada/Finalizada", "Cancelada"]
+                    novo_stat_c = st.selectbox("Novo Status", lista_status, index=lista_status.index(row_c["Status"]) if row_c["Status"] in lista_status else 0)
+                    
+                    arquivo_orcamento_novo = st.file_uploader("Substituir Orçamento Base (Opcional)", type=['pdf', 'png', 'jpg', 'jpeg'], key="up_orc_novo")
+                    
+                    btn_at_compra = st.form_submit_button("Atualizar Compra", use_container_width=True)
+                    
+                    if btn_at_compra:
+                        df_compras.at[idx_c, "Status"] = novo_stat_c
+                        
+                        if arquivo_orcamento_novo is not None:
+                            ext_orc2 = os.path.splitext(arquivo_orcamento_novo.name)[1]
+                            path_orc2 = os.path.join("uploads_orcamentos", f"orc_{id_sel_c}_atualizado{ext_orc2}")
+                            with open(path_orc2, "wb") as f_o2:
+                                f_o2.write(arquivo_orcamento_novo.read())
+                            df_compras.at[idx_c, "Orcamento_Assinado"] = path_orc2
+                            
+                        df_compras.to_csv(ARQUIVO_COMPRAS, index=False)
+                        st.success(f"Status da compra #{id_sel_c} atualizado para '{novo_stat_c}'!")
+                        st.rerun()
+
+        with tab_c3:
+            st.markdown("### Anexar Nota Fiscal e Boleto Físico/Digital (Setor de Compras)")
+            df_c_pendentes_anexo = df_compras[df_compras["Status"].isin(["Compra Autorizada", "Aguardando Entrega/NF"])]
+            
+            if df_c_pendentes_anexo.empty:
+                st.info("Não há compras nos status 'Compra Autorizada' ou 'Aguardando Entrega/NF' aguardando lançamento de NF.")
             else:
-                def formatar_status_compra(val):
-                    val_str = str(val).lower()
-                    if "realizada" in val_str:
-                        return "Compra Realizada 🟢"
-                    elif "recusada" in val_str:
-                        return "Compra Recusada 🔴"
-                    else:
-                        return "Compra em Aberta 🟠"
+                id_sel_anexo = st.selectbox("Selecione a Compra para anexar NF/Boleto", df_c_pendentes_anexo["ID_Compra"].tolist(), key="sel_id_anexo")
+                idx_anexo = df_compras[df_compras["ID_Compra"] == id_sel_anexo].index[0]
                 
-                def formatar_orcamento(val):
-                    if pd.isna(val) or val == "None" or str(val).strip() == "":
-                        return "None"
-                    return "✅ Anexado"
-
-                df_view = df_ger_c.copy()
-                df_view['Status_Visual'] = df_view['Status'].apply(formatar_status_compra)
-                df_view['Orcamento_Assinado'] = df_view['Orcamento_Assinado'].apply(formatar_orcamento)
-                df_view['Data_Apenas'] = df_view['Data_Solicitacao'].astype(str).str.split(" ").str[0]
-
-                col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
-                
-                with col_f1:
-                    opts_data = ["Todas"] + sorted([d for d in df_view['Data_Apenas'].dropna().unique() if str(d).strip() != ""])
-                    filtro_data = st.selectbox("📅 Data", opts_data, key="f_comp_data")
-                with col_f2:
-                    opts_solic = ["Todos"] + sorted([s for s in df_view['Solicitante'].dropna().unique() if str(s).strip() != ""])
-                    filtro_solic = st.selectbox("👤 Solicitante", opts_solic, key="f_comp_solic")
-                with col_f3:
-                    opts_cat = ["Todas"] + sorted([c for c in df_view['Categoria'].dropna().unique() if str(c).strip() != ""])
-                    filtro_cat = st.selectbox("📁 Categoria", opts_cat, key="f_comp_cat")
-                with col_f4:
-                    opts_item = ["Todos"] + sorted([i for i in df_view['Item'].dropna().unique() if str(i).strip() != ""])
-                    filtro_item = st.selectbox("📦 Item", opts_item, key="f_comp_item")
-                with col_f5:
-                    opts_status = ["Todos"] + sorted([st_v for st_v in df_view['Status_Visual'].dropna().unique() if str(st_v).strip() != ""])
-                    filtro_status_v = st.selectbox("🚦 Status", opts_status, key="f_comp_status")
-
-                if filtro_data != "Todas":
-                    df_view = df_view[df_view['Data_Apenas'] == filtro_data]
-                if filtro_solic != "Todos":
-                    df_view = df_view[df_view['Solicitante'] == filtro_solic]
-                if filtro_cat != "Todas":
-                    df_view = df_view[df_view['Categoria'] == filtro_cat]
-                if filtro_item != "Todos":
-                    df_view = df_view[df_view['Item'] == filtro_item]
-                if filtro_status_v != "Todos":
-                    df_view = df_view[df_view['Status_Visual'] == filtro_status_v]
-
-                st.dataframe(df_view[["ID_Compra", "Data_Solicitacao", "Solicitante", "Setor", "Categoria", "Item", "Quantidade", "Status_Visual", "Orcamento_Assinado"]], use_container_width=True, height=200)
-                
-                ids_compras = sorted(df_ger_c["ID_Compra"].unique().tolist(), reverse=True)
-                
-                st.markdown("---")
-                
-                if is_user_admin:
-                    col_ges_1, col_ges_2 = st.columns(2)
+                with st.form("form_anexo_financeiro"):
+                    st.info(f"Anexando documentos para a Compra #{id_sel_anexo}")
+                    arquivo_nf = st.file_uploader("Anexar Nota Fiscal (PDF, JPG, PNG)", type=['pdf', 'png', 'jpg', 'jpeg'], key="up_nf")
+                    arquivo_boleto = st.file_uploader("Anexar Boleto Bancário (PDF, JPG, PNG)", type=['pdf', 'png', 'jpg', 'jpeg'], key="up_bol")
                     
-                    with col_ges_1:
-                        st.markdown("#### 📎 Gerenciar Orçamento Anexado")
-                        id_anexo = st.selectbox("ID da Solicitação", ids_compras, key="select_id_anexo_gerir")
-                        
-                        row_atual_anexo = df_ger_c[df_ger_c["ID_Compra"] == str(id_anexo)]
-                        path_atual = "None"
-                        if not row_atual_anexo.empty:
-                            path_atual = row_atual_anexo.iloc[0].get("Orcamento_Assinado", "None")
-                        
-                        tem_anexo = pd.notna(path_atual) and str(path_atual).strip() != "None" and str(path_atual).strip() != "" and os.path.exists(str(path_atual))
-                        
-                        with st.form("form_anexar_orcamento", clear_on_submit=False):
-                            arquivo_anexo = st.file_uploader("Documento (PDF/Img)", type=["pdf", "png", "jpg", "jpeg"])
-                            excluir_atual = st.checkbox("🗑️ Excluir atual", value=False, disabled=not tem_anexo)
-                            if tem_anexo:
-                                st.caption(f"Atual: {os.path.basename(str(path_atual))}")
-                            else:
-                                st.caption("Nenum anexo atual.")
-                            
-                            col_b1, col_b2 = st.columns(2)
-                            btn_anexar = col_b1.form_submit_button("💾 Salvar", use_container_width=True)
-                            btn_remover_apenas = col_b2.form_submit_button("🗑️ Remover", use_container_width=True)
-                            
-                            if btn_anexar:
-                                acao_realizada = False
-                                if excluir_atual and tem_anexo:
-                                    try:
-                                        if os.path.exists(str(path_atual)):
-                                            os.remove(str(path_atual))
-                                    except:
-                                        pass
-                                    df_ger_c.loc[df_ger_c["ID_Compra"] == str(id_anexo), "Orcamento_Assinado"] = "None"
-                                    acao_realizada = True
-                                
-                                if arquivo_anexo is not None:
-                                    if tem_anexo and not excluir_atual:
-                                        try:
-                                            if os.path.exists(str(path_atual)):
-                                                os.remove(str(path_atual))
-                                        except:
-                                            pass
-                                            
-                                    file_name = f"pedido_{id_anexo}_{arquivo_anexo.name}"
-                                    save_path = os.path.join("uploads_orcamentos", file_name)
-                                    
-                                    with open(save_path, "wb") as f:
-                                        f.write(arquivo_anexo.getbuffer())
-                                        
-                                    df_ger_c.loc[df_ger_c["ID_Compra"] == str(id_anexo), "Orcamento_Assinado"] = save_path
-                                    acao_realizada = True
-                                
-                                if acao_realizada:
-                                    df_to_save = df_ger_c.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
-                                    df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
-                                    st.success("Salvo com sucesso!")
-                                    st.rerun()
-
-                            if btn_remover_apenas:
-                                if tem_anexo:
-                                    try:
-                                        if os.path.exists(str(path_atual)):
-                                            os.remove(str(path_atual))
-                                    except:
-                                        pass
-                                    df_ger_c.loc[df_ger_c["ID_Compra"] == str(id_anexo), "Orcamento_Assinado"] = "None"
-                                    df_to_save = df_ger_c.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
-                                    df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
-                                    st.success("Removido!")
-                                    st.rerun()
-                                else:
-                                    st.warning("Sem anexo.")
-
-                    with col_ges_2:
-                        st.markdown("#### ⚙️ Status, Itens & Exclusão")
-                        id_pedido_status = st.selectbox("ID Pedido", ids_compras, key="sel_status_compra")
-                        
-                        rows_pedido = df_ger_c[df_ger_c["ID_Compra"] == str(id_pedido_status)]
-                        status_atual_p = rows_pedido.iloc[0]["Status"] if not rows_pedido.empty else "Compra em Aberta"
-                        
-                        with st.form("form_mudar_status_compra"):
-                            status_opcs = ["Compra em Aberta 🟠", "Compra Realizada 🟢", "Compra Recusada 🔴"]
-                            idx_st_p = 0
-                            if "Realizada" in status_atual_p: idx_st_p = 1
-                            elif "Recusada" in status_atual_p: idx_st_p = 2
-                            
-                            novo_status_pedido = st.selectbox("Novo Status", status_opcs, index=idx_st_p)
-                            
-                            st.markdown("<b>Editar Itens e Quantidades do Pedido:</b>", unsafe_allow_html=True)
-                            item_edits = []
-                            for idx_r, r_val in rows_pedido.reset_index().iterrows():
-                                st.markdown(f"Item #{idx_r+1}: <b>{r_val['Item']}</b> ({r_val['Categoria']})", unsafe_allow_html=True)
-                                nova_qtd = st.number_input(f"Qtd para {r_val['Item']}", min_value=1, value=int(float(r_val['Quantidade'])) if str(r_val['Quantidade']).replace('.','',1).isdigit() else 1, key=f"qty_{id_pedido_status}_{idx_r}")
-                                novo_nome_item = st.text_input(f"Nome do Item {idx_r+1}", value=r_val['Item'], key=f"name_{id_pedido_status}_{idx_r}")
-                                item_edits.append({"index_original": r_val['index'], "novo_nome": novo_nome_item, "nova_qtd": nova_qtd})
-                            
-                            col_st1, col_st2 = st.columns(2)
-                            btn_salvar_status = col_st1.form_submit_button("💾 Salvar Alterações", use_container_width=True)
-                            btn_exc_compra = col_st2.form_submit_button("🗑️ Excluir Pedido", type="primary", use_container_width=True)
-                            
-                            if btn_salvar_status:
-                                if "Realizada" in novo_status_pedido:
-                                    status_limpo = "Compra Realizada"
-                                elif "Recusada" in novo_status_pedido:
-                                    status_limpo = "Compra Recusada"
-                                else:
-                                    status_limpo = "Compra em Aberta"
-
-                                df_ger_c.loc[df_ger_c["ID_Compra"] == str(id_pedido_status), "Status"] = status_limpo
-                                
-                                for ed in item_edits:
-                                    orig_idx = ed["index_original"]
-                                    df_ger_c.loc[orig_idx, "Item"] = str(ed["novo_nome"]).upper()
-                                    df_ger_c.loc[orig_idx, "Quantidade"] = str(ed["nova_qtd"])
-                                
-                                df_to_save = df_ger_c.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
-                                df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success("Status e itens atualizados com sucesso!")
-                                st.rerun()
-                                
-                            if btn_exc_compra:
-                                df_ger_c = df_ger_c[df_ger_c["ID_Compra"] != str(id_pedido_status)]
-                                df_to_save = df_ger_c.drop(columns=["Status_Visual", "Data_Apenas"], errors="ignore")
-                                df_to_save.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success("Pedido excluído com sucesso!")
-                                st.rerun()
-                else:
-                    st.info("🔒 Gerenciamento restrito a administradores.")
-
-        with tab_comp2:
-            st.markdown("### Adicione os itens desejados na solicitação:")
-            with st.form("form_add_item_compra", clear_on_submit=True):
-                col_i1, col_i2, col_i3 = st.columns([2, 1.5, 1])
-                with col_i1:
-                    item_input = st.text_input("Nome do Material / Item *")
-                with col_i2:
-                    cat_input = st.selectbox("Categoria", ["Material de Escritório", "Item Operacional", "Material de Limpeza"])
-                with col_i3:
-                    qtd_input = st.number_input("Quantidade", min_value=1, value=1)
+                    btn_salvar_anexos = st.form_submit_button("Salvar Anexos Financeiros e Encaminhar para Assinatura", use_container_width=True)
                     
-                btn_add_item = st.form_submit_button("➕ Adicionar Item à Lista", use_container_width=True)
-                if btn_add_item:
-                    if not item_input:
-                        st.error("Informe o nome do material!")
-                    else:
-                        st.session_state.carrinho_compras.append({
-                            "Item": item_input.upper(),
-                            "Categoria": cat_input,
-                            "Quantidade": int(qtd_input)
-                        })
-                        st.success(f"Item '{item_input.upper()}' adicionado!")
+                    if btn_salvar_anexos:
+                        if arquivo_nf is not None:
+                            ext_nf = os.path.splitext(arquivo_nf.name)[1]
+                            path_nf = os.path.join("uploads_orcamentos", f"NF_{id_sel_anexo}{ext_nf}")
+                            with open(path_nf, "wb") as f_nf:
+                                f_nf.write(arquivo_nf.read())
+                            df_compras.at[idx_anexo, "NF_Anexada"] = path_nf
+                            
+                        if arquivo_boleto is not None:
+                            ext_bol = os.path.splitext(arquivo_boleto.name)[1]
+                            path_bol = os.path.join("uploads_orcamentos", f"BOLETO_{id_sel_anexo}{ext_bol}")
+                            with open(path_bol, "wb") as f_bol:
+                                f_bol.write(arquivo_boleto.read())
+                            df_compras.at[idx_anexo, "Boleto_Anexado"] = path_bol
+                            
+                        df_compras.at[idx_anexo, "Status"] = "Pendente Assinatura Diretor"
+                        df_compras.to_csv(ARQUIVO_COMPRAS, index=False)
+                        st.success(f"Arquivos da compra #{id_sel_anexo} anexados. Status alterado para 'Pendente Assinatura Diretor'.")
+                        st.rerun()
+
+        with tab_c4:
+            st.markdown("### ✍️ Painel de Assinaturas (Aprovação de NF/Boletos pelo Diretor/Financeiro)")
             
-            if st.session_state.carrinho_compras:
-                st.markdown("#### Itens Atuais na Solicitação:")
-                df_carrinho = pd.DataFrame(st.session_state.carrinho_compras)
-                st.dataframe(df_carrinho, use_container_width=True)
+            df_c_assinatura = df_compras[df_compras["Status"] == "Pendente Assinatura Diretor"]
+            
+            if df_c_assinatura.empty:
+                st.success("Não há documentos pendentes de assinatura no momento. 🎉")
+            else:
+                id_sel_ass = st.selectbox("Selecione o Lote (Compra) para Revisão e Assinatura", df_c_assinatura["ID_Compra"].tolist(), key="sel_id_ass")
+                idx_ass = df_compras[df_compras["ID_Compra"] == id_sel_ass].index[0]
+                row_ass = df_compras.iloc[idx_ass]
                 
-                if st.button("🗑️ Limpar Lista de Itens"):
-                    st.session_state.carrinho_compras = []
-                    st.rerun()
-                
+                col_docs1, col_docs2 = st.columns(2)
+                with col_docs1:
+                    exibir_documento(row_ass.get("NF_Anexada", "None"), "Nota Fiscal")
+                with col_docs2:
+                    exibir_documento(row_ass.get("Boleto_Anexado", "None"), "Boleto")
+                    
                 st.markdown("---")
-                with st.form("form_finalizar_pedido"):
-                    st.markdown("#### Dados Finais da Solicitação:")
-                    col_f1, col_f2 = st.columns(2)
-                    with col_f1:
-                        solicitante_c = st.text_input("Nome do Solicitante *")
-                        setor_c = st.selectbox("Setor", ["OPERAÇÃO", "MANUTENÇÃO", "PORTARIA", "ADMINISTRATIVO", "TI"])
-                    with col_f2:
-                        obs_c = st.text_area("Observações / Justificativa Geral")
+                st.markdown("#### Ação de Assinatura Digital e Compartilhamento")
+                
+                ass_png_usuario = "None"
+                if os.path.exists(ARQUIVO_USERS):
+                    df_usr_ass = pd.read_csv(ARQUIVO_USERS, dtype=str)
+                    usr_match = df_usr_ass[df_usr_ass["Usuario"] == st.session_state.usuario]
+                    if not usr_match.empty:
+                        ass_png_usuario = str(usr_match.iloc[0].get("Assinatura_PNG", "None"))
                         
-                    submit_final_compra = st.form_submit_button("💾 Salvar e Registrar Pedido Completo", use_container_width=True)
-                    if submit_final_compra:
-                        if not solicitante_c:
-                            st.error("Preencha o nome do Solicitante!")
+                if ass_png_usuario == "None" or not os.path.exists(ass_png_usuario):
+                    st.warning("⚠️ Você não possui uma assinatura PNG cadastrada. Peça ao administrador para cadastrar sua assinatura no menu de Login para carimbar documentos.")
+                else:
+                    st.info(f"Sua assinatura digital está ativa ({ass_png_usuario}). Ela será aplicada graficamente nos documentos abaixo.")
+                
+                email_destino_def = "thiagosc2026@gmail.com"
+                
+                with st.form("form_assinar_documentos"):
+                    st.write("**Documentos a Assinar:**")
+                    assinar_nf = st.checkbox("Carimbar e Assinar Nota Fiscal", value=True)
+                    assinar_bol = st.checkbox("Carimbar e Assinar Boleto", value=True)
+                    
+                    st.write("**Opções de Envio por E-mail (Via SMTP do seu usuário):**")
+                    enviar_por_email = st.checkbox("Enviar documentos assinados por E-mail?", value=True)
+                    email_destinatario = st.text_input("E-mail do Destinatário (ex: Financeiro)", value=email_destino_def)
+                    corpo_email_ass = st.text_area("Corpo da Mensagem", value=f"Olá, \n\nSegue em anexo a Nota Fiscal e o Boleto aprovados e assinados digitalmente referentes à solicitação de compra #{id_sel_ass}.\n\nAtenciosamente,\n{st.session_state.usuario}")
+                    
+                    btn_executar_assinatura = st.form_submit_button("Aplicar Assinatura Digital, Mudar Status e Enviar E-mail", use_container_width=True)
+                    
+                    if btn_executar_assinatura:
+                        if ass_png_usuario == "None" or not os.path.exists(ass_png_usuario):
+                            st.error("Assinatura PNG não localizada. Configure-a primeiro no painel de administração.")
                         else:
-                            df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-                            if not df_c.empty and "ID_Compra" in df_c.columns:
-                                ids_nums = pd.to_numeric(df_c["ID_Compra"], errors="coerce").dropna()
-                                novo_id_c = int(ids_nums.max() + 1) if not ids_nums.empty else 501
-                            else:
-                                novo_id_c = 501
+                            sucesso_ass_nf = True
+                            sucesso_ass_bol = True
+                            anexos_para_email = []
+                            
+                            caminho_nf_original = row_ass.get("NF_Anexada", "None")
+                            if assinar_nf and caminho_nf_original != "None" and os.path.exists(caminho_nf_original):
+                                sucesso_ass_nf = carimbar_assinatura_no_documento(caminho_nf_original, ass_png_usuario, st.session_state.usuario)
+                                if sucesso_ass_nf:
+                                    anexos_para_email.append(caminho_nf_original)
+                            
+                            caminho_bol_original = row_ass.get("Boleto_Anexado", "None")
+                            if assinar_bol and caminho_bol_original != "None" and os.path.exists(caminho_bol_original):
+                                sucesso_ass_bol = carimbar_assinatura_no_documento(caminho_bol_original, ass_png_usuario, st.session_state.usuario)
+                                if sucesso_ass_bol:
+                                    anexos_para_email.append(caminho_bol_original)
+                                    
+                            if sucesso_ass_nf and sucesso_ass_bol:
+                                msg_email_feedback = "E-mail não solicitado."
                                 
-                            data_hora_atual = datetime.now().strftime("%Y-%m-%d %H:%M")
-                            
-                            novas_linhas = []
-                            for it in st.session_state.carrinho_compras:
-                                novas_linhas.append({
-                                    "ID_Compra": str(novo_id_c),
-                                    "Data_Solicitacao": data_hora_atual,
-                                    "Solicitante": solicitante_c.upper(),
-                                    "Setor": setor_c.upper(),
-                                    "Categoria": it["Categoria"],
-                                    "Item": it["Item"],
-                                    "Quantidade": str(it["Quantidade"]),
-                                    "Observacoes": obs_c.upper() if obs_c else "",
-                                    "Status": "Compra em Aberta",
-                                    "Orcamento_Assinado": "None",
-                                    "NF_Anexada": "None",
-                                    "Boleto_Anexado": "None",
-                                    "Assinado_Por": "None"
-                                })
-                            
-                            df_c = pd.concat([df_c, pd.DataFrame(novas_linhas)], ignore_index=True)
-                            df_c.to_csv(ARQUIVO_COMPRAS, index=False)
-                            st.session_state.carrinho_compras = []
-                            st.success(f"Solicitação de Compra #{novo_id_c} registrada com sucesso!")
-                            st.rerun()
-
-        with tab_comp3:
-            df_c_print = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-            if df_c_print.empty:
-                st.warning("Nenhuma solicitação de compra cadastrada para impressão.")
-            else:
-                ids_disponiveis = sorted(df_c_print["ID_Compra"].unique().tolist(), reverse=True)
-                
-                col_print1, col_print2 = st.columns([2, 1])
-                with col_print1:
-                    pedido_sel_id = st.selectbox("Selecione o ID do Pedido de Compra:", ids_disponiveis)
-                
-                itens_pedido = df_c_print[df_c_print["ID_Compra"] == str(pedido_sel_id)]
-                row_c_base = itens_pedido.iloc[0]
-                
-                with col_print2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    anexo_path = row_c_base.get("Orcamento_Assinado", "None")
-                    if pd.notna(anexo_path) and str(anexo_path).strip() != "None" and str(anexo_path).strip() != "" and os.path.exists(str(anexo_path)):
-                        with open(anexo_path, "rb") as file:
-                            st.download_button(
-                                label="📥 Baixar Orçamento Anexado",
-                                data=file,
-                                file_name=os.path.basename(str(anexo_path)),
-                                mime="application/octet-stream",
-                                use_container_width=True
-                            )
-                    else:
-                        st.info("Nenhum orçamento anexado a este pedido.")
-                
-                st.markdown("---")
-                
-                logo_base64 = ""
-                if os.path.exists("logo.png"):
-                    with open("logo.png", "rb") as img_file:
-                        logo_base64 = base64.b64encode(img_file.read()).decode()
-                        
-                linhas_tabela_html = ""
-                for _, row in itens_pedido.iterrows():
-                    linhas_tabela_html += f"""
-                    <tr>
-                        <td style="border: 1px solid #000; padding: 8px; width: 60%;"><b>{row['Item']}</b> ({row['Categoria']})</td>
-                        <td style="border: 1px solid #000; padding: 8px; width: 40%; text-align: center;">{row['Quantidade']}</td>
-                    </tr>
-                    """
-                        
-                print_compra_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
-        .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
-        .btn-imprimir {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-        @media print {{ .print-btn-container {{ display: none !important; }} body {{ padding: 0; }} }}
-    </style>
-</head>
-<body>
-    <div class="print-btn-container">
-        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Ordem de Solicitação de Compra</button>
-    </div>
-    <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
-            <tr>
-                <td style="width: 28%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
-                    <img src="data:image/png;base64,{logo_base64}" style="max-height: 45px; max-width: 100%;">
-                </td>
-                <td style="width: 44%; border: 1px solid #000; text-align: center; vertical-align: middle;">
-                    <h3 style="margin: 0; color: #000 !important; font-size: 15px;">Ordem de Solicitação de Compras</h3>
-                </td>
-                <td style="width: 28%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
-                    <b>LOG-COMPRAS</b>
-                </td>
-            </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important; margin-top: 5px;">
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>ID Pedido:</b> #{row_c_base['ID_Compra']}</td>
-                <td style="border: 1px solid #000; padding: 5px; width: 34%;"><b>Data:</b> {row_c_base['Data_Solicitacao']}</td>
-                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Status:</b> {row_c_base['Status']}</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px;" colspan="2"><b>Solicitante:</b> {row_c_base['Solicitante']}</td>
-                <td style="border: 1px solid #000; padding: 5px;"><b>Setor:</b> {row_c_base['Setor']}</td>
-            </tr>
-        </table>
-        <div style="margin-top: 15px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #000 !important;">
-                <thead>
-                    <tr style="background-color: #e0e0e0;">
-                        <th style="border: 1px solid #000; padding: 8px; text-align: left;">Item / Material</th>
-                        <th style="border: 1px solid #000; padding: 8px; text-align: center;">Quantidade</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {linhas_tabela_html}
-                </tbody>
-            </table>
-        </div>
-        <div style="border: 1px solid #000; margin-top: 15px;">
-            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Observações / Justificativa</div>
-            <div style="padding: 10px; min-height: 50px; font-size: 13px; color: #000 !important;">{row_c_base.get('Observacoes', '')}</div>
-        </div>
-        <table style="width: 100%; margin-top: 40px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
-            <tr>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Solicitante ({row_c_base['Solicitante']})</b></td>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Aprovação Compras / Gerência</b></td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
-"""
-                components.html(print_compra_html, height=750, scrolling=True)
-
-        # ABA 4 - ASSINATURAS E ENVIOS DE E-MAIL (SOMENTE ADMIN)
-        if is_user_admin:
-            with tab_comp4:
-                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto)")
-                
-                df_ass = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-                if df_ass.empty:
-                    st.info("Nenhuma compra registrada para assinar.")
-                else:
-                    ids_ass = sorted(df_ass["ID_Compra"].unique().tolist(), reverse=True)
-                    
-                    col_sel1, col_sel2 = st.columns([2.5, 1])
-                    
-                    with col_sel1:
-                        id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
-                        rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
-                        row_base_ass = rows_ass.iloc[0]
-                    
-                    df_u_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                    row_u_logged = df_u_check[df_u_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                    ass_png_path = "None"
-                    if not row_u_logged.empty:
-                        ass_png_path = str(row_u_logged.iloc[0].get("Assinatura_PNG", "None"))
-                    tem_assinatura_png = (ass_png_path != "None" and os.path.exists(ass_png_path))
-
-                    with col_sel2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        btn_assinar_agora = st.button("✍️ Assinar Doc", disabled=not tem_assinatura_png, use_container_width=True)
-                        if btn_assinar_agora:
-                            documentos_para_assinar = [
-                                str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                str(row_base_ass.get("NF_Anexada", "None")),
-                                str(row_base_ass.get("Boleto_Anexado", "None"))
-                            ]
-                            
-                            assinaram_algo = False
-                            for doc in documentos_para_assinar:
-                                if doc != "None" and os.path.exists(doc):
-                                    res = carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario)
-                                    if res:
-                                        assinaram_algo = True
-                                        
-                            if assinaram_algo:
-                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
-                                df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success(f"Documentos do Pedido #{id_sel_ass} assinados digitalmente por {st.session_state.usuario}!")
-                                st.rerun()
-                            else:
-                                st.error("Nenhum documento válido encontrado/anexado para assinar.")
-
-                    p_orc = row_base_ass.get("Orcamento_Assinado", "None")
-                    p_nf = row_base_ass.get("NF_Anexada", "None")
-                    p_bol = row_base_ass.get("Boleto_Anexado", "None")
-                    p_ass = row_base_ass.get("Assinado_Por", "None")
-                    
-                    has_orc = pd.notna(p_orc) and str(p_orc).strip() != "None" and os.path.exists(str(p_orc))
-                    has_nf = pd.notna(p_nf) and str(p_nf).strip() != "None" and os.path.exists(str(p_nf))
-                    has_bol = pd.notna(p_bol) and str(p_bol).strip() != "None" and os.path.exists(str(p_bol))
-                    has_signature = pd.notna(p_ass) and str(p_ass).strip() != "None" and str(p_ass).strip() != ""
-                    
-                    val_orc = '<span class="badge-success">✅ Anexado</span>' if has_orc else '<span class="badge-danger">❌ Pendente</span>'
-                    val_nf = '<span class="badge-success">✅ Anexada</span>' if has_nf else '<span class="badge-danger">❌ Pendente</span>'
-                    val_bol = '<span class="badge-success">✅ Anexado</span>' if has_bol else '<span class="badge-danger">❌ Pendente</span>'
-                    val_ass = f'<span class="badge-success">✅ Por {p_ass}</span>' if has_signature else '<span class="badge-warning">⚠️ Não Assinado</span>'
-
-                    st.markdown(f"""
-                    <div class="status-card-container">
-                        <div class="status-card">
-                            <div class="status-card-title">Orçamento</div>
-                            <div class="status-card-value">{val_orc}</div>
-                        </div>
-                        <div class="status-card">
-                            <div class="status-card-title">Nota Fiscal</div>
-                            <div class="status-card-value">{val_nf}</div>
-                        </div>
-                        <div class="status-card">
-                            <div class="status-card-title">Boleto</div>
-                            <div class="status-card-value">{val_bol}</div>
-                        </div>
-                        <div class="status-card">
-                            <div class="status-card-title">Assinatura Digital</div>
-                            <div class="status-card-value">{val_ass}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    itens_do_pedido_str = ", ".join([f"{r['Item']} (Qtd: {r['Quantidade']})" for _, r in rows_ass.iterrows()])
-                    solicitante_pedido = row_base_ass.get("Solicitante", "N/A")
-                    setor_pedido = row_base_ass.get("Setor", "N/A")
-                    obs_pedido = row_base_ass.get("Observacoes", "Sem observações")
-
-                    st.info(f"📋 **Descrição do Pedido #{id_sel_ass}:**\n\n"
-                            f"* **Solicitante:** {solicitante_pedido} | **Setor:** {setor_pedido}\n"
-                            f"* **Itens:** {itens_do_pedido_str}\n"
-                            f"* **Observações:** {obs_pedido}")
-
-                    st.markdown("---")
-                    
-                    col_upload, col_acoes = st.columns(2)
-                    
-                    with col_upload:
-                        with st.form("form_up_nf_bol"):
-                            st.markdown("**Upload de Nota Fiscal e Boleto**")
-                            up_nf = st.file_uploader("Upload da Nota Fiscal (NF)", type=["pdf", "png", "jpg", "jpeg"])
-                            up_bol = st.file_uploader("Upload do Boleto", type=["pdf", "png", "jpg", "jpeg"])
-                            
-                            if st.form_submit_button("Salvar Documentos"):
-                                salvou_algo = False
-                                if up_nf is not None:
-                                    nf_name = f"nf_{id_sel_ass}_{up_nf.name}"
-                                    nf_path = os.path.join("uploads_orcamentos", nf_name)
-                                    with open(nf_path, "wb") as f: 
-                                        f.write(up_nf.getbuffer())
-                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "NF_Anexada"] = nf_path
-                                    salvou_algo = True
-                                    
-                                if up_bol is not None:
-                                    bol_name = f"boleto_{id_sel_ass}_{up_bol.name}"
-                                    bol_path = os.path.join("uploads_orcamentos", bol_name)
-                                    with open(bol_path, "wb") as f: 
-                                        f.write(up_bol.getbuffer())
-                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Boleto_Anexado"] = bol_path
-                                    salvou_algo = True
-                                    
-                                if salvou_algo:
-                                    df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                    st.success("Documentos salvos com sucesso!")
-                                    st.rerun()
-                                else:
-                                    st.warning("Selecione ao menos um arquivo para salvar.")
-
-                    with col_acoes:
-                        if not tem_assinatura_png:
-                            st.warning("⚠️ Seu usuário não possui uma assinatura em PNG cadastrada na tela de Login.")
-                        
-                        with st.form("form_enviar_email_docs"):
-                            st.markdown("**📧 Enviar Documentos por E-mail:**")
-                            dest_email = st.text_input("E-mail do Destinatário", value="financeiro@stang.com.br")
-                            obs_email = st.text_area("Observações do E-mail", value="", height=100)
-                            
-                            btn_enviar_e = st.form_submit_button("🚀 Enviar E-mail com Anexos", use_container_width=True)
-                            
-                            if btn_enviar_e:
-                                if not dest_email:
-                                    st.error("Informe o e-mail do destinatário.")
-                                else:
-                                    df_u_l = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                                    row_u_l = df_u_l[df_u_l["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                                    
-                                    if row_u_l.empty:
-                                        st.error("Dados de usuário não encontrados para envio.")
+                                if enviar_por_email:
+                                    if not email_destinatario:
+                                        msg_email_feedback = "❌ Destinatário não informado, e-mail cancelado."
+                                    elif not anexos_para_email:
+                                        msg_email_feedback = "❌ Sem documentos válidos para anexar."
                                     else:
-                                        u_row_dict = row_u_l.iloc[0].to_dict()
-                                        cfg_e_dict = {
-                                            "Email_Remetente": u_row_dict.get("Email_Usuario", ""),
-                                            "Senha_App": u_row_dict.get("Senha_App_Email", ""),
-                                            "Servidor_SMTP": u_row_dict.get("Servidor_SMTP", "smtp.gmail.com"),
-                                            "Porta_SMTP": u_row_dict.get("Porta_SMTP", "587"),
-                                            "Nome_Remetente": st.session_state.usuario
+                                        usr_cfg_match = df_usr_ass[df_usr_ass["Usuario"] == st.session_state.usuario].iloc[0]
+                                        config_smtp = {
+                                            "Email_Remetente": usr_cfg_match.get("Email_Usuario", ""),
+                                            "Senha_App": usr_cfg_match.get("Senha_App_Email", ""),
+                                            "Servidor_SMTP": usr_cfg_match.get("Servidor_SMTP", "smtp.gmail.com"),
+                                            "Porta_SMTP": usr_cfg_match.get("Porta_SMTP", "587"),
+                                            "Nome_Remetente": f"{st.session_state.usuario} - Intranet"
                                         }
                                         
-                                        anexos_envio = [
-                                            str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                            str(row_base_ass.get("NF_Anexada", "None")),
-                                            str(row_base_ass.get("Boleto_Anexado", "None"))
-                                        ]
-                                        
-                                        corpo_dinamico = f"Documentação referente ao Pedido de Compra #{id_sel_ass}.\n\nObservações: {obs_email}" if obs_email else f"Documentação referente ao Pedido de Compra #{id_sel_ass}."
-                                        
-                                        sucesso_e, msg_e = enviar_email_real(
-                                            destinatario=dest_email,
-                                            assunto=f"Documentação do Pedido de Compra #{id_sel_ass} - Intranet Stang",
-                                            corpo=corpo_dinamico,
-                                            anexos=anexos_envio,
-                                            config=cfg_e_dict
-                                        )
-                                        
-                                        if sucesso_e:
-                                            st.success(f"E-mail enviado com sucesso para {dest_email}!")
-                                        else:
-                                            st.error(f"Erro no envio: {msg_e}")
+                                        assunto = f"Aprovação deAqui está o código completo refatorado, incluindo todas as implementações solicitadas: o **botão de impressão do relatório geral de O.S.**, o **Dashboard global integrado estilo Power BI com fundo transparente (dividido entre O.S. e Compras)**, o **gráfico comparativo de prazos no painel de FMs**, e a **restauração exata** das lógicas de Assinaturas e Compras que haviam sido cortadas.
 
-                    st.markdown("---")
-                    st.markdown("#### 📄 Visualização de Documentos Vinculados ao Pedido:")
-                    
-                    c_doc1, c_doc2, c_doc3 = st.columns(3)
-                    with c_doc1:
-                        exibir_documento(row_base_ass.get("Orcamento_Assinado", "None"), "Orçamento")
-                    with c_doc2:
-                        exibir_documento(row_base_ass.get("NF_Anexada", "None"), "Nota Fiscal")
-                    with c_doc3:
-                        exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
+```python
+import streamlit as st
+import streamlit.components.v1 as components
+import pandas as pd
+import os
+from datetime import datetime, timedelta
+import plotly.express as px
+import plotly.graph_objects as go
+from PIL import Image
+import base64
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+import io
+
+# Tenta importar bibliotecas para manipulação e carimbo de PDFs
+try:
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table as RLTable, TableStyle, Image as RLImage
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    HAS_PDF_LIBS = True
+except ImportError:
+    HAS_PDF_LIBS = False
+
+# Cria diretórios de uploads se não existirem
+os.makedirs("uploads_orcamentos", exist_ok=True)
+os.makedirs("uploads_assinaturas", exist_ok=True)
+
+# Configuração da página
+icone_path = "icone.ico" if os.path.exists("icone.ico") else ("logo.png" if os.path.exists("logo.png") else "🔧")
+st.set_page_config(
+    page_title="Intranet Stang - Gestão e Manutenção",
+    page_icon=icone_
