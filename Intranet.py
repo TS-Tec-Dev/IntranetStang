@@ -132,6 +132,7 @@ if os.path.exists("capa.png"):
         .badge-success {{ color: #00ffaa; }}
         .badge-danger {{ color: #ff4b4b; }}
         .badge-warning {{ color: #ffb703; }}
+        .badge-info {{ color: #00d2ff; }}
         
         /* CORREÇÃO DO MENU LATERAL (RADIO BUTTONS) COM SUPORTE A TEMA */
         [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
@@ -346,7 +347,6 @@ def gerar_pdf_os(os_row):
     
     elements = []
     
-    # 1. Tabela de Cabeçalho (Logo, Título e FM)
     logo_cell = Paragraph("<b>STANG</b>", style_title)
     if os.path.exists("logo.png"):
         try:
@@ -372,7 +372,6 @@ def gerar_pdf_os(os_row):
     elements.append(t_header)
     elements.append(Spacer(1, 4))
     
-    # 2. Dados de Identificação (Número, Data, Hora)
     data_criacao_val = str(os_row.get('Data_Criacao', ''))
     partes_dt = data_criacao_val.split(' ')
     data_str = partes_dt[0] if len(partes_dt) > 0 else ''
@@ -394,7 +393,6 @@ def gerar_pdf_os(os_row):
     elements.append(t_info)
     elements.append(Spacer(1, 4))
     
-    # 3. Tipo e Prioridade
     prio_data = [
         [
             Paragraph("Tipo de Manutenção", style_cell_center_bold),
@@ -415,7 +413,6 @@ def gerar_pdf_os(os_row):
     elements.append(t_prio)
     elements.append(Spacer(1, 4))
     
-    # 4. Setor, Solicitante e Equipamento
     equip_val = os_row.get('Equipamento', 'N/A')
     if pd.isna(equip_val) or str(equip_val).strip() == "":
         equip_val = 'N/A'
@@ -440,7 +437,6 @@ def gerar_pdf_os(os_row):
     elements.append(t_solic)
     elements.append(Spacer(1, 4))
     
-    # 5. Seções de Texto: Descrição, Solução, Itens Trocados
     def criar_secao_texto(titulo, conteudo, min_height=40):
         val_txt = conteudo if pd.notna(conteudo) else ""
         sec_data = [
@@ -464,7 +460,6 @@ def gerar_pdf_os(os_row):
     elements.append(criar_secao_texto("Itens Trocados", os_row.get('Itens_Trocados', ''), min_height=35))
     elements.append(Spacer(1, 25))
     
-    # 6. Assinaturas
     finalizador_val = os_row.get('finalizado_por', '')
     if pd.isna(finalizador_val):
         finalizador_val = ''
@@ -486,7 +481,6 @@ def gerar_pdf_os(os_row):
     buffer.seek(0)
     return buffer.getvalue()
 
-# --- FUNÇÃO PARA GERAR O HTML COMPLETO DA OS DA IMPRESSÃO ---
 def gerar_html_os_impressao(os_row):
     equipamento_val = os_row['Equipamento'] if pd.notna(os_row.get('Equipamento')) else 'N/A'
     solucao_val = os_row['Solucao'] if pd.notna(os_row.get('Solucao')) else ''
@@ -578,7 +572,6 @@ def gerar_html_os_impressao(os_row):
 </html>
 """
 
-# --- FUNÇÃO PARA APLICAR A ASSINATURA DIGITAL NO FINAL DO DOCUMENTO ---
 def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_usuario):
     if not os.path.exists(caminho_doc) or not os.path.exists(caminho_assinatura_png):
         return False
@@ -650,7 +643,6 @@ def carimbar_assinatura_no_documento(caminho_doc, caminho_assinatura_png, nome_u
             
     return True
 
-# --- FUNÇÃO PARA ENVIO REAL DE E-MAIL VIA SMTP ---
 def enviar_email_real(destinatario, assunto, corpo, anexos, config):
     try:
         remetente = config.get("Email_Remetente", "")
@@ -1499,11 +1491,11 @@ if menu is not None:
             st.session_state.carrinho_compras = []
             
         if is_user_admin:
-            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação", "🖨️ Imprimir Ordem de Compra", "✍️ Assinaturas (Admin)"])
-            tab_comp1, tab_comp2, tab_comp3, tab_comp4 = abas_compras
+            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação"])
+            tab_comp1, tab_comp2 = abas_compras
         else:
-            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação", "🖨️ Imprimir Ordem de Compra"])
-            tab_comp1, tab_comp2, tab_comp3 = abas_compras
+            abas_compras = st.tabs(["📋 Gerenciar Solicitações", "📝 Nova Solicitação"])
+            tab_comp1, tab_comp2 = abas_compras
         
         with tab_comp1:
             st.markdown("### Gerenciar Solicitações e Anexar Orçamento")
@@ -1703,7 +1695,7 @@ if menu is not None:
                 with col_i1:
                     item_input = st.text_input("Nome do Material / Item *")
                 with col_i2:
-                    cat_input = st.selectbox("Categoria", ["Material de Escritório", "Item Operacional", "Material de Limpeza"])
+                    cat_input = st.selectbox("Categoria", ["Material de Escritório", "Item Operacional", "Material de Limpeza", "Informática / TI", "Manutenção Industrial", "Outros"])
                 with col_i3:
                     qtd_input = st.number_input("Quantidade", min_value=1, value=1)
                     
@@ -1714,7 +1706,7 @@ if menu is not None:
                     else:
                         st.session_state.carrinho_compras.append({
                             "Item": item_input.upper(),
-                            "Categoria": cat_input,
+                            "Categoria": cat_input.upper(),
                             "Quantidade": int(qtd_input)
                         })
                         st.success(f"Item '{item_input.upper()}' adicionado!")
@@ -1724,45 +1716,36 @@ if menu is not None:
                 df_carrinho = pd.DataFrame(st.session_state.carrinho_compras)
                 st.dataframe(df_carrinho, use_container_width=True)
                 
-                if st.button("🗑️ Limpar Lista de Itens"):
-                    st.session_state.carrinho_compras = []
-                    st.rerun()
-                
-                st.markdown("---")
-                with st.form("form_finalizar_pedido"):
-                    st.markdown("#### Dados Finais da Solicitação:")
-                    col_f1, col_f2 = st.columns(2)
-                    with col_f1:
-                        solicitante_c = st.text_input("Nome do Solicitante *")
-                        setor_c = st.selectbox("Setor", ["OPERAÇÃO", "MANUTENÇÃO", "PORTARIA", "ADMINISTRATIVO", "TI"])
-                    with col_f2:
-                        obs_c = st.text_area("Observações / Justificativa Geral")
+                with st.form("form_finalizar_solicitacao"):
+                    st.markdown("#### Dados do Pedido")
+                    col_sol_1, col_sol_2 = st.columns(2)
+                    with col_sol_1:
+                        solicitante_compra = st.text_input("Nome do Solicitante *")
+                    with col_sol_2:
+                        setor_compra = st.selectbox("Setor *", ["OPERAÇÃO", "MANUTENÇÃO", "PORTARIA", "ADMINISTRATIVO", "TI"])
                         
-                    submit_final_compra = st.form_submit_button("💾 Salvar e Registrar Pedido Completo", use_container_width=True)
-                    if submit_final_compra:
-                        if not solicitante_c:
-                            st.error("Preencha o nome do Solicitante!")
+                    obs_compra = st.text_area("Observações (Ex: Marca, Aplicação, Urgência)")
+                    
+                    btn_finalizar_compra = st.form_submit_button("✅ Concluir e Enviar Solicitação")
+                    
+                    if btn_finalizar_compra:
+                        if not solicitante_compra:
+                            st.error("Preencha o Nome do Solicitante.")
                         else:
-                            df_c = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-                            if not df_c.empty and "ID_Compra" in df_c.columns:
-                                ids_nums = pd.to_numeric(df_c["ID_Compra"], errors="coerce").dropna()
-                                novo_id_c = int(ids_nums.max() + 1) if not ids_nums.empty else 501
-                            else:
-                                novo_id_c = 501
-                                
-                            data_hora_atual = datetime.now().strftime("%Y-%m-%d %H:%M")
+                            df_compras = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+                            novo_id_compra = int(df_compras["ID_Compra"].astype(float).max() + 1) if not df_compras.empty and df_compras["ID_Compra"].astype(float).max() > 0 else 5001
                             
                             novas_linhas = []
-                            for it in st.session_state.carrinho_compras:
+                            for i, row_carr in enumerate(st.session_state.carrinho_compras):
                                 novas_linhas.append({
-                                    "ID_Compra": str(novo_id_c),
-                                    "Data_Solicitacao": data_hora_atual,
-                                    "Solicitante": solicitante_c.upper(),
-                                    "Setor": setor_c.upper(),
-                                    "Categoria": it["Categoria"],
-                                    "Item": it["Item"],
-                                    "Quantidade": str(it["Quantidade"]),
-                                    "Observacoes": obs_c.upper() if obs_c else "",
+                                    "ID_Compra": str(novo_id_compra),
+                                    "Data_Solicitacao": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                                    "Solicitante": solicitante_compra.upper(),
+                                    "Setor": setor_compra.upper(),
+                                    "Categoria": row_carr["Categoria"],
+                                    "Item": row_carr["Item"],
+                                    "Quantidade": str(row_carr["Quantidade"]),
+                                    "Observacoes": obs_compra.upper(),
                                     "Status": "Compra em Aberta",
                                     "Orcamento_Assinado": "None",
                                     "NF_Anexada": "None",
@@ -1770,316 +1753,180 @@ if menu is not None:
                                     "Assinado_Por": "None"
                                 })
                             
-                            df_c = pd.concat([df_c, pd.DataFrame(novas_linhas)], ignore_index=True)
-                            df_c.to_csv(ARQUIVO_COMPRAS, index=False)
+                            df_compras = pd.concat([df_compras, pd.DataFrame(novas_linhas)], ignore_index=True)
+                            df_compras.to_csv(ARQUIVO_COMPRAS, index=False)
+                            
                             st.session_state.carrinho_compras = []
-                            st.success(f"Solicitação de Compra #{novo_id_c} registrada com sucesso!")
+                            st.success(f"Solicitação de Compra #{novo_id_compra} gerada com sucesso!")
                             st.rerun()
+                
+                if st.button("🗑️ Limpar Lista de Itens"):
+                    st.session_state.carrinho_compras = []
+                    st.rerun()
 
-        with tab_comp3:
-            df_c_print = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-            if df_c_print.empty:
-                st.warning("Nenhuma solicitação de compra cadastrada para impressão.")
+    # --- TELA 6: DASHBOARD E GRÁFICOS (POWER BI STYLE) ---
+    elif menu == "📊 Dashboard":
+        st.markdown("# 📊 Dashboard Gerencial Interativo")
+        st.markdown("Indicadores chave de performance (KPIs) com filtros globais de período (Estilo Power BI).")
+
+        df_dash_os = carregar_banco_os()
+        df_dash_compras = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
+
+        if df_dash_os.empty and df_dash_compras.empty:
+            st.warning("Não há dados suficientes no sistema para gerar o dashboard.")
+        else:
+            # --- PREPARAÇÃO DAS DATAS (Extrair Dia, Mês, Ano das O.S. e Compras) ---
+            if not df_dash_os.empty:
+                df_dash_os['Data_Parsed'] = pd.to_datetime(df_dash_os['Data_Criacao'].str.split(' ').str[0], format='%d/%m/%Y', errors='coerce')
+                df_dash_os['Ano'] = df_dash_os['Data_Parsed'].dt.year.fillna(0).astype(int).astype(str)
+                df_dash_os['Mes'] = df_dash_os['Data_Parsed'].dt.month.fillna(0).astype(int).astype(str).str.zfill(2)
+                df_dash_os['Dia'] = df_dash_os['Data_Parsed'].dt.day.fillna(0).astype(int).astype(str).str.zfill(2)
             else:
-                ids_disponiveis = sorted(df_c_print["ID_Compra"].unique().tolist(), reverse=True)
-                
-                col_print1, col_print2 = st.columns([2, 1])
-                with col_print1:
-                    pedido_sel_id = st.selectbox("Selecione o ID do Pedido de Compra:", ids_disponiveis)
-                
-                itens_pedido = df_c_print[df_c_print["ID_Compra"] == str(pedido_sel_id)]
-                row_c_base = itens_pedido.iloc[0]
-                
-                with col_print2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    anexo_path = row_c_base.get("Orcamento_Assinado", "None")
-                    if pd.notna(anexo_path) and str(anexo_path).strip() != "None" and str(anexo_path).strip() != "" and os.path.exists(str(anexo_path)):
-                        with open(anexo_path, "rb") as file:
-                            st.download_button(
-                                label="📥 Baixar Orçamento Anexado",
-                                data=file,
-                                file_name=os.path.basename(str(anexo_path)),
-                                mime="application/octet-stream",
-                                use_container_width=True
-                            )
-                    else:
-                        st.info("Nenhum orçamento anexado a este pedido.")
-                
-                st.markdown("---")
-                
-                logo_base64 = ""
-                if os.path.exists("logo.png"):
-                    with open("logo.png", "rb") as img_file:
-                        logo_base64 = base64.b64encode(img_file.read()).decode()
-                        
-                linhas_tabela_html = ""
-                for _, row in itens_pedido.iterrows():
-                    linhas_tabela_html += f"""
-                    <tr>
-                        <td style="border: 1px solid #000; padding: 8px; width: 60%;"><b>{row['Item']}</b> ({row['Categoria']})</td>
-                        <td style="border: 1px solid #000; padding: 8px; width: 40%; text-align: center;">{row['Quantidade']}</td>
-                    </tr>
-                    """
-                        
-                print_compra_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body {{ background-color: #ffffff; color: #000000; margin: 0; padding: 10px; font-family: Arial, sans-serif; }}
-        .print-btn-container {{ text-align: center; margin-bottom: 20px; }}
-        .btn-imprimir {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-        @media print {{ .print-btn-container {{ display: none !important; }} body {{ padding: 0; }} }}
-    </style>
-</head>
-<body>
-    <div class="print-btn-container">
-        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Ordem de Solicitação de Compra</button>
-    </div>
-    <div style="background-color: #ffffff; color: #000000; padding: 20px; border: 2px solid #000; max-width: 800px; margin: auto;">
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
-            <tr>
-                <td style="width: 28%; border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle;">
-                    <img src="data:image/png;base64,{logo_base64}" style="max-height: 45px; max-width: 100%;">
-                </td>
-                <td style="width: 44%; border: 1px solid #000; text-align: center; vertical-align: middle;">
-                    <h3 style="margin: 0; color: #000 !important; font-size: 15px;">Ordem de Solicitação de Compras</h3>
-                </td>
-                <td style="width: 28%; border: 1px solid #000; padding: 5px; font-size: 11px; text-align: right; color: #000 !important; vertical-align: middle;">
-                    <b>LOG-COMPRAS</b>
-                </td>
-            </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; color: #000 !important; margin-top: 5px;">
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>ID Pedido:</b> #{row_c_base['ID_Compra']}</td>
-                <td style="border: 1px solid #000; padding: 5px; width: 34%;"><b>Data:</b> {row_c_base['Data_Solicitacao']}</td>
-                <td style="border: 1px solid #000; padding: 5px; width: 33%;"><b>Status:</b> {row_c_base['Status']}</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px;" colspan="2"><b>Solicitante:</b> {row_c_base['Solicitante']}</td>
-                <td style="border: 1px solid #000; padding: 5px;"><b>Setor:</b> {row_c_base['Setor']}</td>
-            </tr>
-        </table>
-        <div style="margin-top: 15px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #000 !important;">
-                <thead>
-                    <tr style="background-color: #e0e0e0;">
-                        <th style="border: 1px solid #000; padding: 8px; text-align: left;">Item / Material</th>
-                        <th style="border: 1px solid #000; padding: 8px; text-align: center;">Quantidade</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {linhas_tabela_html}
-                </tbody>
-            </table>
-        </div>
-        <div style="border: 1px solid #000; margin-top: 15px;">
-            <div style="background-color: #e0e0e0; text-align: center; font-size: 12px; font-weight: bold; border-bottom: 1px solid #000; padding: 4px; color: #000 !important;">Observações / Justificativa</div>
-            <div style="padding: 10px; min-height: 50px; font-size: 13px; color: #000 !important;">{row_c_base.get('Observacoes', '')}</div>
-        </div>
-        <table style="width: 100%; margin-top: 40px; font-size: 12px; border-collapse: collapse; color: #000 !important;">
-            <tr>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Solicitante ({row_c_base['Solicitante']})</b></td>
-                <td style="text-align: center; width: 50%;">__________________________________________________<br><b>Aprovação Compras / Gerência</b></td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
-"""
-                components.html(print_compra_html, height=750, scrolling=True)
+                df_dash_os['Ano'] = '0'
+                df_dash_os['Mes'] = '00'
+                df_dash_os['Dia'] = '00'
 
-        # ABA 4 - ASSINATURAS E ENVIOS DE E-MAIL (SOMENTE ADMIN)
-        if is_user_admin:
-            with tab_comp4:
-                st.markdown("### ✍️ Painel de Assinaturas (NF e Boleto)")
+            if not df_dash_compras.empty:
+                df_dash_compras['Data_Parsed'] = pd.to_datetime(df_dash_compras['Data_Solicitacao'].str.split(' ').str[0], format='%d/%m/%Y', errors='coerce')
+                df_dash_compras['Ano'] = df_dash_compras['Data_Parsed'].dt.year.fillna(0).astype(int).astype(str)
+                df_dash_compras['Mes'] = df_dash_compras['Data_Parsed'].dt.month.fillna(0).astype(int).astype(str).str.zfill(2)
+                df_dash_compras['Dia'] = df_dash_compras['Data_Parsed'].dt.day.fillna(0).astype(int).astype(str).str.zfill(2)
+            else:
+                df_dash_compras['Ano'] = '0'
+                df_dash_compras['Mes'] = '00'
+                df_dash_compras['Dia'] = '00'
+
+            # --- FILTROS GLOBAIS ---
+            st.markdown("### 🔍 Filtros de Tempo Globais")
+            
+            todos_anos = list(set(df_dash_os['Ano'].unique()) | set(df_dash_compras['Ano'].unique()))
+            todos_anos = sorted([a for a in todos_anos if a != '0'], reverse=True)
+            
+            todos_meses = list(set(df_dash_os['Mes'].unique()) | set(df_dash_compras['Mes'].unique()))
+            todos_meses = sorted([m for m in todos_meses if m != '00'])
+            
+            todos_dias = list(set(df_dash_os['Dia'].unique()) | set(df_dash_compras['Dia'].unique()))
+            todos_dias = sorted([d for d in todos_dias if d != '00'])
+
+            col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
+            with col_filtro1:
+                filtro_ano = st.selectbox("📅 Ano", ["Todos"] + todos_anos)
+            with col_filtro2:
+                filtro_mes = st.selectbox("📅 Mês", ["Todos"] + todos_meses)
+            with col_filtro3:
+                filtro_dia = st.selectbox("📅 Dia", ["Todos"] + todos_dias)
+
+            # --- APLICAÇÃO DOS FILTROS GLOBAIS ---
+            df_os_filtrado = df_dash_os.copy()
+            df_compras_filtrado = df_dash_compras.copy()
+
+            if filtro_ano != "Todos":
+                df_os_filtrado = df_os_filtrado[df_os_filtrado['Ano'] == filtro_ano]
+                df_compras_filtrado = df_compras_filtrado[df_compras_filtrado['Ano'] == filtro_ano]
+            
+            if filtro_mes != "Todos":
+                df_os_filtrado = df_os_filtrado[df_os_filtrado['Mes'] == filtro_mes]
+                df_compras_filtrado = df_compras_filtrado[df_compras_filtrado['Mes'] == filtro_mes]
                 
-                df_ass = pd.read_csv(ARQUIVO_COMPRAS, dtype=str)
-                if df_ass.empty:
-                    st.info("Nenhuma compra registrada para assinar.")
+            if filtro_dia != "Todos":
+                df_os_filtrado = df_os_filtrado[df_os_filtrado['Dia'] == filtro_dia]
+                df_compras_filtrado = df_compras_filtrado[df_compras_filtrado['Dia'] == filtro_dia]
+
+            # --- CÁLCULO DOS KPIs ---
+            total_os = len(df_os_filtrado)
+            os_finalizadas = len(df_os_filtrado[df_os_filtrado['Status'] == 'Finalizada']) if total_os > 0 else 0
+            os_abertas = len(df_os_filtrado[df_os_filtrado['Status'].isin(['Em Aberto', 'Em Andamento'])]) if total_os > 0 else 0
+            tx_conclusao_os = (os_finalizadas / total_os * 100) if total_os > 0 else 0.0
+
+            total_itens_compras = len(df_compras_filtrado)
+            pedidos_unicos = df_compras_filtrado['ID_Compra'].nunique() if total_itens_compras > 0 else 0
+
+            st.markdown("---")
+            
+            # Renderizando os CARDS estlizados com HTML (Já definidos no seu CSS)
+            st.markdown(f"""
+            <div class="status-card-container">
+                <div class="status-card">
+                    <div class="status-card-title">Total O.S. (Período)</div>
+                    <div class="status-card-value badge-info">{total_os}</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-card-title">O.S. Finalizadas</div>
+                    <div class="status-card-value badge-success">{os_finalizadas}</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-card-title">O.S. Pendentes</div>
+                    <div class="status-card-value badge-danger">{os_abertas}</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-card-title">Taxa Conclusão (O.S.)</div>
+                    <div class="status-card-value badge-success">{tx_conclusao_os:.1f}%</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-card-title">Pedidos de Compras</div>
+                    <div class="status-card-value badge-warning">{pedidos_unicos} (Itens: {total_itens_compras})</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- GRÁFICOS (PLOTLY / POWER BI STYLE) ---
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_graf1, col_graf2 = st.columns(2)
+            
+            # Configuração de temas para se mesclar ao fundo escuro
+            template_grafico = "plotly_dark"
+            
+            with col_graf1:
+                if not df_os_filtrado.empty:
+                    df_setor = df_os_filtrado.groupby('Setor').size().reset_index(name='Quantidade')
+                    fig_setor = px.bar(df_setor, x='Setor', y='Quantidade', 
+                                       title='Distribuição de O.S. por Setor',
+                                       color='Setor', template=template_grafico, text_auto=True)
+                    fig_setor.update_layout(margin=dict(l=20, r=20, t=40, b=20), showlegend=False)
+                    st.plotly_chart(fig_setor, use_container_width=True)
                 else:
-                    ids_ass = sorted(df_ass["ID_Compra"].unique().tolist(), reverse=True)
+                    st.info("Gráfico: Sem dados de O.S. para os filtros aplicados.")
                     
-                    col_sel1, col_sel2 = st.columns([2.5, 1])
-                    
-                    with col_sel1:
-                        id_sel_ass = st.selectbox("Selecione o Número do Pedido (Orçamento):", ids_ass, key="sel_ass_id")
-                        rows_ass = df_ass[df_ass["ID_Compra"] == str(id_sel_ass)]
-                        row_base_ass = rows_ass.iloc[0]
-                    
-                    df_u_check = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                    row_u_logged = df_u_check[df_u_check["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                    ass_png_path = "None"
-                    if not row_u_logged.empty:
-                        ass_png_path = str(row_u_logged.iloc[0].get("Assinatura_PNG", "None"))
-                    tem_assinatura_png = (ass_png_path != "None" and os.path.exists(ass_png_path))
+                if not df_compras_filtrado.empty:
+                    df_cat_compras = df_compras_filtrado.groupby('Categoria').size().reset_index(name='Qtd')
+                    fig_cat = px.bar(df_cat_compras, y='Categoria', x='Qtd', orientation='h',
+                                     title='Itens de Compra por Categoria',
+                                     color='Categoria', template=template_grafico, text_auto=True)
+                    fig_cat.update_layout(margin=dict(l=20, r=20, t=40, b=20), showlegend=False)
+                    st.plotly_chart(fig_cat, use_container_width=True)
 
-                    with col_sel2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        btn_assinar_agora = st.button("✍️ Assinar Doc", disabled=not tem_assinatura_png, use_container_width=True)
-                        if btn_assinar_agora:
-                            documentos_para_assinar = [
-                                str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                str(row_base_ass.get("NF_Anexada", "None")),
-                                str(row_base_ass.get("Boleto_Anexado", "None"))
-                            ]
-                            
-                            assinaram_algo = False
-                            for doc in documentos_para_assinar:
-                                if doc != "None" and os.path.exists(doc):
-                                    res = carimbar_assinatura_no_documento(doc, ass_png_path, st.session_state.usuario)
-                                    if res:
-                                        assinaram_algo = True
-                                        
-                            if assinaram_algo:
-                                df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Assinado_Por"] = st.session_state.usuario
-                                df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                st.success(f"Documentos do Pedido #{id_sel_ass} assinados digitalmente por {st.session_state.usuario}!")
-                                st.rerun()
-                            else:
-                                st.error("Nenhum documento válido encontrado/anexado para assinar.")
+            with col_graf2:
+                if not df_os_filtrado.empty:
+                    df_status = df_os_filtrado.groupby('Status').size().reset_index(name='Quantidade')
+                    fig_status = px.pie(df_status, names='Status', values='Quantidade', hole=0.5,
+                                        title='Status das Ordens de Serviço', template=template_grafico,
+                                        color='Status', 
+                                        color_discrete_map={'Finalizada':'#00ffaa', 'Em Aberto':'#ff4b4b', 'Em Andamento':'#ffb703'})
+                    fig_status.update_traces(textposition='inside', textinfo='percent+label')
+                    fig_status.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+                    st.plotly_chart(fig_status, use_container_width=True)
+                else:
+                    st.info("Gráfico: Sem dados de O.S. para os filtros aplicados.")
 
-                    p_orc = row_base_ass.get("Orcamento_Assinado", "None")
-                    p_nf = row_base_ass.get("NF_Anexada", "None")
-                    p_bol = row_base_ass.get("Boleto_Anexado", "None")
-                    p_ass = row_base_ass.get("Assinado_Por", "None")
-                    
-                    has_orc = pd.notna(p_orc) and str(p_orc).strip() != "None" and os.path.exists(str(p_orc))
-                    has_nf = pd.notna(p_nf) and str(p_nf).strip() != "None" and os.path.exists(str(p_nf))
-                    has_bol = pd.notna(p_bol) and str(p_bol).strip() != "None" and os.path.exists(str(p_bol))
-                    has_signature = pd.notna(p_ass) and str(p_ass).strip() != "None" and str(p_ass).strip() != ""
-                    
-                    val_orc = '<span class="badge-success">✅ Anexado</span>' if has_orc else '<span class="badge-danger">❌ Pendente</span>'
-                    val_nf = '<span class="badge-success">✅ Anexada</span>' if has_nf else '<span class="badge-danger">❌ Pendente</span>'
-                    val_bol = '<span class="badge-success">✅ Anexado</span>' if has_bol else '<span class="badge-danger">❌ Pendente</span>'
-                    val_ass = f'<span class="badge-success">✅ Por {p_ass}</span>' if has_signature else '<span class="badge-warning">⚠️ Não Assinado</span>'
+                if not df_compras_filtrado.empty:
+                    df_status_compras = df_compras_filtrado.groupby('Status').size().reset_index(name='Quantidade')
+                    fig_status_comp = px.pie(df_status_compras, names='Status', values='Quantidade', hole=0.5,
+                                        title='Status das Compras', template=template_grafico,
+                                        color='Status', 
+                                        color_discrete_map={'Compra Realizada':'#00ffaa', 'Compra Recusada':'#ff4b4b', 'Compra em Aberta':'#ffb703'})
+                    fig_status_comp.update_traces(textposition='inside', textinfo='percent+label')
+                    fig_status_comp.update_layout(margin=dict(l=20, r=20, t=40, b=20), showlegend=False)
+                    st.plotly_chart(fig_status_comp, use_container_width=True)
 
-                    st.markdown(f"""
-                    <div class="status-card-container">
-                        <div class="status-card">
-                            <div class="status-card-title">Orçamento</div>
-                            <div class="status-card-value">{val_orc}</div>
-                        </div>
-                        <div class="status-card">
-                            <div class="status-card-title">Nota Fiscal</div>
-                            <div class="status-card-value">{val_nf}</div>
-                        </div>
-                        <div class="status-card">
-                            <div class="status-card-title">Boleto</div>
-                            <div class="status-card-value">{val_bol}</div>
-                        </div>
-                        <div class="status-card">
-                            <div class="status-card-title">Assinatura Digital</div>
-                            <div class="status-card-value">{val_ass}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    itens_do_pedido_str = ", ".join([f"{r['Item']} (Qtd: {r['Quantidade']})" for _, r in rows_ass.iterrows()])
-                    solicitante_pedido = row_base_ass.get("Solicitante", "N/A")
-                    setor_pedido = row_base_ass.get("Setor", "N/A")
-                    obs_pedido = row_base_ass.get("Observacoes", "Sem observações")
-
-                    st.info(f"📋 **Descrição do Pedido #{id_sel_ass}:**\n\n"
-                            f"* **Solicitante:** {solicitante_pedido} | **Setor:** {setor_pedido}\n"
-                            f"* **Itens:** {itens_do_pedido_str}\n"
-                            f"* **Observações:** {obs_pedido}")
-
-                    st.markdown("---")
-                    
-                    col_upload, col_acoes = st.columns(2)
-                    
-                    with col_upload:
-                        with st.form("form_up_nf_bol"):
-                            st.markdown("**Upload de Nota Fiscal e Boleto**")
-                            up_nf = st.file_uploader("Upload da Nota Fiscal (NF)", type=["pdf", "png", "jpg", "jpeg"])
-                            up_bol = st.file_uploader("Upload do Boleto", type=["pdf", "png", "jpg", "jpeg"])
-                            
-                            if st.form_submit_button("Salvar Documentos"):
-                                salvou_algo = False
-                                if up_nf is not None:
-                                    nf_name = f"nf_{id_sel_ass}_{up_nf.name}"
-                                    nf_path = os.path.join("uploads_orcamentos", nf_name)
-                                    with open(nf_path, "wb") as f: 
-                                        f.write(up_nf.getbuffer())
-                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "NF_Anexada"] = nf_path
-                                    salvou_algo = True
-                                    
-                                if up_bol is not None:
-                                    bol_name = f"boleto_{id_sel_ass}_{up_bol.name}"
-                                    bol_path = os.path.join("uploads_orcamentos", bol_name)
-                                    with open(bol_path, "wb") as f: 
-                                        f.write(up_bol.getbuffer())
-                                    df_ass.loc[df_ass["ID_Compra"] == str(id_sel_ass), "Boleto_Anexado"] = bol_path
-                                    salvou_algo = True
-                                    
-                                if salvou_algo:
-                                    df_ass.to_csv(ARQUIVO_COMPRAS, index=False)
-                                    st.success("Documentos salvos com sucesso!")
-                                    st.rerun()
-                                else:
-                                    st.warning("Selecione ao menos um arquivo para salvar.")
-
-                    with col_acoes:
-                        if not tem_assinatura_png:
-                            st.warning("⚠️ Seu usuário não possui uma assinatura em PNG cadastrada na tela de Login.")
-                        
-                        with st.form("form_enviar_email_docs"):
-                            st.markdown("**📧 Enviar Documentos por E-mail:**")
-                            dest_email = st.text_input("E-mail do Destinatário", value="financeiro@stang.com.br")
-                            obs_email = st.text_area("Observações do E-mail", value="", height=100)
-                            
-                            btn_enviar_e = st.form_submit_button("🚀 Enviar E-mail com Anexos", use_container_width=True)
-                            
-                            if btn_enviar_e:
-                                if not dest_email:
-                                    st.error("Informe o e-mail do destinatário.")
-                                else:
-                                    df_u_l = pd.read_csv(ARQUIVO_USERS, dtype=str)
-                                    row_u_l = df_u_l[df_u_l["Usuario"].str.lower() == st.session_state.usuario.lower()]
-                                    
-                                    if row_u_l.empty:
-                                        st.error("Dados de usuário não encontrados para envio.")
-                                    else:
-                                        u_row_dict = row_u_l.iloc[0].to_dict()
-                                        cfg_e_dict = {
-                                            "Email_Remetente": u_row_dict.get("Email_Usuario", ""),
-                                            "Senha_App": u_row_dict.get("Senha_App_Email", ""),
-                                            "Servidor_SMTP": u_row_dict.get("Servidor_SMTP", "smtp.gmail.com"),
-                                            "Porta_SMTP": u_row_dict.get("Porta_SMTP", "587"),
-                                            "Nome_Remetente": st.session_state.usuario
-                                        }
-                                        
-                                        anexos_envio = [
-                                            str(row_base_ass.get("Orcamento_Assinado", "None")),
-                                            str(row_base_ass.get("NF_Anexada", "None")),
-                                            str(row_base_ass.get("Boleto_Anexado", "None"))
-                                        ]
-                                        
-                                        corpo_dinamico = f"Documentação referente ao Pedido de Compra #{id_sel_ass}.\n\nObservações: {obs_email}" if obs_email else f"Documentação referente ao Pedido de Compra #{id_sel_ass}."
-                                        
-                                        sucesso_e, msg_e = enviar_email_real(
-                                            destinatario=dest_email,
-                                            assunto=f"Documentação do Pedido de Compra #{id_sel_ass} - Intranet Stang",
-                                            corpo=corpo_dinamico,
-                                            anexos=anexos_envio,
-                                            config=cfg_e_dict
-                                        )
-                                        
-                                        if sucesso_e:
-                                            st.success(f"E-mail enviado com sucesso para {dest_email}!")
-                                        else:
-                                            st.error(f"Erro no envio: {msg_e}")
-
-                    st.markdown("---")
-                    st.markdown("#### 📄 Visualização de Documentos Vinculados ao Pedido:")
-                    
-                    c_doc1, c_doc2, c_doc3 = st.columns(3)
-                    with c_doc1:
-                        exibir_documento(row_base_ass.get("Orcamento_Assinado", "None"), "Orçamento")
-                    with c_doc2:
-                        exibir_documento(row_base_ass.get("NF_Anexada", "None"), "Nota Fiscal")
-                    with c_doc3:
-                        exibir_documento(row_base_ass.get("Boleto_Anexado", "None"), "Boleto")
+            # Evolução Temporal Linear O.S.
+            if not df_os_filtrado.empty:
+                st.markdown("### 📈 Evolução de O.S. ao Longo do Tempo")
+                # Filtra apenas a coluna de datas validas para gerar o gráfico
+                df_evo_os = df_os_filtrado.dropna(subset=['Data_Parsed'])
+                if not df_evo_os.empty:
+                    df_evolucao = df_evo_os.groupby('Data_Parsed').size().reset_index(name='Quantidade')
+                    fig_evo = px.area(df_evolucao, x='Data_Parsed', y='Quantidade', markers=True,
+                                      template=template_grafico)
+                    fig_evo.update_traces(line_color='#00ffcc', fillcolor='rgba(0, 255, 204, 0.2)')
+                    fig_evo.update_layout(xaxis_title="Data de Abertura", yaxis_title="Volume de O.S.", margin=dict(l=20, r=20, t=20, b=20))
+                    st.plotly_chart(fig_evo, use_container_width=True)
