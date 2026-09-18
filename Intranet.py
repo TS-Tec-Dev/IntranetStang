@@ -285,8 +285,6 @@ def carregar_banco_os():
     if "ID" in df.columns:
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
-df.to_csv(ARQUIVO_OS, index=False, encoding='utf-8-sig')
-
 # Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64)
 def exibir_documento(caminho_arquivo, titulo):
     if pd.isna(caminho_arquivo) or str(caminho_arquivo).strip() in ["None", ""]:
