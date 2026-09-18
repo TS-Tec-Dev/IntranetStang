@@ -1878,7 +1878,7 @@ if menu is not None:
 
     # --- TELA 6: DASHBOARD ---
     elif menu == "📊 Dashboard":
-        st.markdown("# 📊 Dashboard Executivo - Power BI Style")
+        st.markdown("# 📊 Dashboard Gerencial")
         st.markdown("Visão consolidada de indicadores de Compras e Ordens de Serviço (O.S.).")
         
         # Carregar dados
