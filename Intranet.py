@@ -275,10 +275,17 @@ inicializar_bancos()
 def carregar_banco_os():
     if not os.path.exists(ARQUIVO_OS):
         inicializar_bancos()
-    df = pd.read_csv(ARQUIVO_OS, dtype=str)
+    # Adicionar encoding utf-8-sig para preservar acentos corretamente
+    df = pd.read_csv(ARQUIVO_OS, dtype=str, encoding='utf-8-sig')
+    
+    # Substituir strings literais indesejadas por vazios reais
+    df = df.fillna("")
+    df.replace(["nan", "None", "<NA>"], "", inplace=True)
+    
     if "ID" in df.columns:
         df["ID"] = pd.to_numeric(df["ID"], errors="coerce").fillna(0).astype(int)
     return df
+df.to_csv(ARQUIVO_OS, index=False, encoding='utf-8-sig')
 
 # Função auxiliar para renderizar arquivos (Imagens / PDFs em Base64)
 def exibir_documento(caminho_arquivo, titulo):
