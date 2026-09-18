@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 import io
+import html as htmlmod
 
 # Tenta importar bibliotecas para manipulação e carimbo de PDFs
 try:
