@@ -39,16 +39,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# --- AUTO-REFRESH / LOOPING A CADA 3 SEGUNDOS ---
-components.html("""
-    <script>
-        setInterval(function(){
-            window.location.reload();
-        }, 3000);
-    </script>
-""", height=0)
-
 hide_streamlit_style = """
     <style>
     </style>
