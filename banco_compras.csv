@@ -1,2 +1,23 @@
 ﻿,ID_Compra,Data_Solicitacao,Solicitante,Setor,Categoria,Item,Quantidade,Status_Visual,Orcamento_Assinado
-
+0,501,2026-09-19 11:07,VOLMAR,OPERAÇÃO,Material de Escritório,LUVA NITRILICA  LONGA TAM. G,24,Compra Realizada 🟢,✅ Anexado
+1,501,2026-09-19 11:07,VOLMAR,OPERAÇÃO,Material de Escritório,LUVA NITRILICA LONA TAM. GG,24,Compra Realizada 🟢,✅ Anexado
+2,502,2026-09-19 11:11,VOLMAR,OPERAÇÃO,Material de Escritório,MANTA ABSORVENTE,100,Compra Realizada 🟢,✅ Anexado
+3,503,2026-09-19 11:16,BRUNO,MANUTENÇÃO,Material de Escritório,COLA  CONTATO,3,Compra Realizada 🟢,✅ Anexado
+4,504,2026-09-19 11:20,THIAGO,OPERAÇÃO,Material de Escritório,CADEADO 30MM,1,Compra Realizada 🟢,✅ Anexado
+5,505,2026-09-19 11:32,BRUNO,MANUTENÇÃO,Material de Escritório,PROLONG ROLO FIBRA DE VIDRO,1,Compra Realizada 🟢,✅ Anexado
+6,506,2026-09-19 11:35,JORGE,ADMINISTRATIVO,Material de Escritório,ARQUIVO MORTO PAPELÃO,30,Compra Realizada 🟢,✅ Anexado
+7,506,2026-09-19 11:35,JORGE,ADMINISTRATIVO,Material de Escritório,FILTRO DE CAFÉ 103,10,Compra Realizada 🟢,✅ Anexado
+8,507,2026-09-19 11:43,JORGE,ADMINISTRATIVO,Material de Escritório,CANETA BIC AZUL,50,Compra Realizada 🟢,✅ Anexado
+9,507,2026-09-19 11:43,JORGE,ADMINISTRATIVO,Material de Escritório,ESTILETE,3,Compra Realizada 🟢,✅ Anexado
+10,507,2026-09-19 11:43,JORGE,ADMINISTRATIVO,Material de Escritório,FITA LARGA TRANSP.,6,Compra Realizada 🟢,✅ Anexado
+11,507,2026-09-19 11:43,JORGE,ADMINISTRATIVO,Material de Escritório,MARCA TEXTO ,12,Compra Realizada 🟢,✅ Anexado
+12,507,2026-09-19 11:43,JORGE,ADMINISTRATIVO,Material de Escritório,PRANCHETA,6,Compra Realizada 🟢,✅ Anexado
+13,508,2026-09-19 11:52,VOLMAR,OPERAÇÃO,Material de Escritório,OCULOS DE SEGURANÇA GRADUADO,6,Compra Realizada 🟢,✅ Anexado
+14,509,2026-09-19 11:55,VOLMAR,MANUTENÇÃO,Material de Escritório,RECARGA DE EXTINTOR,4,Compra Realizada 🟢,✅ Anexado
+15,510,2026-09-19 11:58,VOLMAR,OPERAÇÃO,Material de Escritório,LGE ,3,Compra Realizada 🟢,✅ Anexado
+16,511,2026-09-21 13:11,BRUNO,MANUTENÇÃO,Material de Escritório,CAL HIDRATADO 20K,2,Compra em Aberta 🟠,None
+17,511,2026-09-21 13:11,BRUNO,MANUTENÇÃO,Material de Escritório,FITA ISOLANTE 20 MTS,5,Compra em Aberta 🟠,None
+18,512,2026-09-21 13:33,KKETHILYN,MANUTENÇÃO,Item Operacional,CONSULTORIA,1,Compra em Aberta 🟠,None
+19,513,2026-09-21 13:37,KKETHILYN,OPERAÇÃO,Item Operacional,LOCAÇÃO,1,Compra em Aberta 🟠,None
+20,514,2026-09-21 13:41,KKETHILYN,OPERAÇÃO,Material de Escritório,INTERNET,1,Compra em Aberta 🟠,None
+21,515,2026-09-21 13:48,KKETHILYN,OPERAÇÃO,Material de Escritório,BRITO MONITORAMENTO NF 822,1,Compra em Aberta 🟠,None
